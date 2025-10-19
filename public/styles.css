@@ -585,8 +585,8 @@ body {
     position: fixed;
     bottom: 20px;
     right: 20px;
-    width: 100px;
-    height: 100px;
+    width: 50px;
+    height: 50px;
     background: rgba(0, 0, 0, 0.8);
     border-radius: 50%;
     border: 3px solid #ff4444;
@@ -619,22 +619,42 @@ body {
 
 .trackpad-arrows {
     position: relative;
-    width: 80px;
-    height: 80px;
+    width: 40px;
+    height: 40px;
 }
 
 .arrow {
     position: absolute;
-    width: 20px;
-    height: 20px;
+    width: 10px;
+    height: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
+    font-size: 8px;
     font-weight: bold;
     color: #fff;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
     pointer-events: none;
+}
+
+/* Trackpad dot indicator */
+.trackpad-dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #4CAF50;
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+    pointer-events: none;
+}
+
+.trackpad-dot.visible {
+    opacity: 1;
 }
 
 .arrow-up {
@@ -677,17 +697,17 @@ body {
     .mobile-trackpad {
         bottom: 10px;
         right: 10px;
-        width: 90px;
-        height: 90px;
+        width: 45px;
+        height: 45px;
     }
     
     .trackpad-arrows {
-        width: 70px;
-        height: 70px;
+        width: 35px;
+        height: 35px;
     }
     
     .arrow {
-        font-size: 14px;
+        font-size: 7px;
     }
 }
 
@@ -696,17 +716,17 @@ body {
     .mobile-trackpad {
         bottom: 5px;
         right: 5px;
-        width: 80px;
-        height: 80px;
+        width: 40px;
+        height: 40px;
     }
     
     .trackpad-arrows {
-        width: 60px;
-        height: 60px;
+        width: 30px;
+        height: 30px;
     }
     
     .arrow {
-        font-size: 12px;
+        font-size: 6px;
     }
 }
 
@@ -716,51 +736,6 @@ body {
     transform: scale(0.9);
 }
 
-/* Direction indicators for trackpad */
-.trackpad-center.moving-up {
-    background: rgba(76, 175, 80, 0.6);
-    box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
-}
-
-.trackpad-center.moving-down {
-    background: rgba(76, 175, 80, 0.6);
-    box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
-}
-
-.trackpad-center.moving-left {
-    background: rgba(76, 175, 80, 0.6);
-    box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
-}
-
-.trackpad-center.moving-right {
-    background: rgba(76, 175, 80, 0.6);
-    box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
-}
-
-/* Highlight the active arrow when moving */
-.trackpad-center.moving-up .arrow-up {
-    color: #4CAF50;
-    text-shadow: 0 0 10px rgba(76, 175, 80, 0.8);
-    transform: scale(1.2);
-}
-
-.trackpad-center.moving-down .arrow-down {
-    color: #4CAF50;
-    text-shadow: 0 0 10px rgba(76, 175, 80, 0.8);
-    transform: scale(1.2);
-}
-
-.trackpad-center.moving-left .arrow-left {
-    color: #4CAF50;
-    text-shadow: 0 0 10px rgba(76, 175, 80, 0.8);
-    transform: scale(1.2);
-}
-
-.trackpad-center.moving-right .arrow-right {
-    color: #4CAF50;
-    text-shadow: 0 0 10px rgba(76, 175, 80, 0.8);
-    transform: scale(1.2);
-}
 
 /* Trackpad directional zones */
 .trackpad-center::before {

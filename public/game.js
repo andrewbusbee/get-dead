@@ -60,7 +60,8 @@ class GetDeadGame {
             
             // Trackpad elements
             mobileTrackpad: document.getElementById('mobileTrackpad'),
-            trackpadCenter: document.getElementById('trackpadCenter')
+            trackpadCenter: document.getElementById('trackpadCenter'),
+            trackpadDot: document.getElementById('trackpadDot')
         };
     }
     
@@ -727,40 +728,53 @@ class GetDeadGame {
         let isTouching = false;
         let currentDirection = null;
         
-        // Add touch events to the entire game board area for better mobile UX
-        const gameBoard = this.elements.gameBoard;
+        // Add touch events to the entire page for maximum mobile UX
+        // This allows users to touch anywhere on the screen to control their character
         
-        // Touch start - anywhere on the game board
-        gameBoard.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (!this.gameState || this.gameState.gameState !== 'playing') return;
-            
-            const touch = e.touches[0];
-            touchStartX = touch.clientX;
-            touchStartY = touch.clientY;
-            isTouching = true;
-            
-            // Calculate initial direction
-            this.updateTouchDirection(touch.clientX, touch.clientY, true);
+        // Touch start - anywhere on the page
+        document.addEventListener('touchstart', (e) => {
+            // Only prevent default if we're in the game and not touching interactive elements
+            if (this.gameState && this.gameState.gameState === 'playing') {
+                // Check if the touch is on an interactive element
+                const target = e.target;
+                const isInteractiveElement = target.tagName === 'INPUT' || 
+                                          target.tagName === 'BUTTON' || 
+                                          target.tagName === 'A' ||
+                                          target.classList.contains('emoji-option') ||
+                                          target.closest('.game-room') ||
+                                          target.closest('.game-setup') ||
+                                          target.closest('.game-over');
+                
+                if (!isInteractiveElement) {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    touchStartX = touch.clientX;
+                    touchStartY = touch.clientY;
+                    isTouching = true;
+                    
+                    // Calculate initial direction
+                    this.updateTouchDirection(touch.clientX, touch.clientY, true);
+                }
+            }
         });
         
         // Touch move - continuous movement while dragging
-        gameBoard.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            if (!isTouching || !this.gameState || this.gameState.gameState !== 'playing') return;
-            
-            const touch = e.touches[0];
-            this.updateTouchDirection(touch.clientX, touch.clientY, false);
+        document.addEventListener('touchmove', (e) => {
+            if (isTouching && this.gameState && this.gameState.gameState === 'playing') {
+                e.preventDefault();
+                const touch = e.touches[0];
+                this.updateTouchDirection(touch.clientX, touch.clientY, false);
+            }
         });
         
         // Touch end - stop movement
-        gameBoard.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            if (!isTouching) return;
-            
-            isTouching = false;
-            this.stopContinuousMovement();
-            this.updateTrackpadDisplay(null);
+        document.addEventListener('touchend', (e) => {
+            if (isTouching) {
+                e.preventDefault();
+                isTouching = false;
+                this.stopContinuousMovement();
+                this.updateTrackpadDisplay(null);
+            }
         });
         
         // Also keep the original canvas touch events for swipe gestures
@@ -810,10 +824,10 @@ class GetDeadGame {
         const currentPlayer = this.gameState.players.find(p => p.id === this.playerId);
         if (!currentPlayer || !currentPlayer.isAlive || currentPlayer.isCaught) return;
         
-        // Calculate direction from touch position to center of screen
-        const gameBoardRect = this.elements.gameBoard.getBoundingClientRect();
-        const centerX = gameBoardRect.left + gameBoardRect.width / 2;
-        const centerY = gameBoardRect.top + gameBoardRect.height / 2;
+        // Calculate direction from touch position to center of the viewport
+        // This allows touch controls to work from anywhere on the page
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
         
         const deltaX = clientX - centerX;
         const deltaY = clientY - centerY;
@@ -866,17 +880,84 @@ class GetDeadGame {
     }
     
     updateTrackpadDisplay(directions) {
-        if (!this.elements.trackpadCenter) return;
-        
-        // Remove all direction classes
-        this.elements.trackpadCenter.classList.remove('moving-up', 'moving-down', 'moving-left', 'moving-right');
+        if (!this.elements.trackpadDot) return;
         
         if (directions && directions.length > 0) {
-            // Add classes for each direction
-            directions.forEach(dir => {
-                this.elements.trackpadCenter.classList.add(`moving-${dir}`);
-            });
+            // Show the dot and position it based on direction
+            this.elements.trackpadDot.classList.add('visible');
+            this.positionTrackpadDot(directions);
+        } else {
+            // Hide the dot when not moving
+            this.elements.trackpadDot.classList.remove('visible');
         }
+    }
+    
+    positionTrackpadDot(directions) {
+        if (!this.elements.trackpadDot || !directions || directions.length === 0) return;
+        
+        // Calculate dot position based on primary direction
+        const primaryDirection = directions[0];
+        const trackpadRadius = 20; // Half of trackpad width (40px / 2)
+        const dotRadius = 4; // Half of dot width (8px / 2)
+        const maxDistance = trackpadRadius - dotRadius - 2; // Leave some margin
+        
+        let x = 0, y = 0;
+        
+        // Calculate position based on direction
+        switch (primaryDirection) {
+            case 'up':
+                y = -maxDistance;
+                break;
+            case 'down':
+                y = maxDistance;
+                break;
+            case 'left':
+                x = -maxDistance;
+                break;
+            case 'right':
+                x = maxDistance;
+                break;
+        }
+        
+        // For diagonal movement, position between the two directions
+        if (directions.length > 1) {
+            const secondaryDirection = directions[1];
+            const diagonalDistance = maxDistance * 0.7; // Slightly closer to center for diagonal
+            
+            switch (primaryDirection) {
+                case 'up':
+                    y = -diagonalDistance;
+                    break;
+                case 'down':
+                    y = diagonalDistance;
+                    break;
+                case 'left':
+                    x = -diagonalDistance;
+                    break;
+                case 'right':
+                    x = diagonalDistance;
+                    break;
+            }
+            
+            // Adjust for secondary direction
+            switch (secondaryDirection) {
+                case 'up':
+                    y = -diagonalDistance;
+                    break;
+                case 'down':
+                    y = diagonalDistance;
+                    break;
+                case 'left':
+                    x = -diagonalDistance;
+                    break;
+                case 'right':
+                    x = diagonalDistance;
+                    break;
+            }
+        }
+        
+        // Apply the position
+        this.elements.trackpadDot.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
     }
     
     setupTrackpadControls() {
