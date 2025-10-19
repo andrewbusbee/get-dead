@@ -43,24 +43,16 @@ A multiplayer WebSocket-based chase game where players try to avoid being caught
 ### Using Docker Compose (Recommended)
 
 ```bash
-docker-compose up --build
+services:
+  get-dead-server:
+    image: ghcr.io/andrewbusbee/get-dead:latest
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
 ```
 
-The game will be available at `http://localhost:8080`
+The game will be available at `http://localhost:3000`
 
-### Manual Setup
-
-1. Install dependencies:
-```bash
-npm install
-```
-
-2. Start the server:
-```bash
-npm start
-```
-
-3. Open `http://localhost:3000` in your browser (or `http://localhost:8080` if using Docker)
 
 ## Technical Details
 
