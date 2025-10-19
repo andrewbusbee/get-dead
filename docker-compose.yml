@@ -1,8 +1,6 @@
 services:
-  game-server:
-    build: .
+  get-dead-server:
+    image: ghcr.io/andrewbusbee/get-dead:latest
     ports:
-      - "8080:3000"
-    environment:
-      - NODE_ENV=production
+      - "3000:3000"
     restart: unless-stopped
