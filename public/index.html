@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Get Dead</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="landing-page">
+            <h1 class="game-title">Get Dead</h1>
+            <p class="game-subtitle">A multiplayer chase game</p>
+            <button id="startGameBtn" class="start-button">Start Game</button>
+        </div>
+        
+        <div class="game-setup hidden" id="gameSetup">
+            <h2>Game Setup</h2>
+            <div class="setup-content">
+                <div class="player-info">
+                    <label for="playerName">Your Name:</label>
+                    <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+                </div>
+                
+                <div class="room-info">
+                    <label>Game Room:</label>
+                    <div class="room-link-container">
+                        <input type="text" id="roomLink" readonly>
+                        <button id="copyLinkBtn">Copy Link</button>
+                    </div>
+                </div>
+                
+                
+                <button id="joinRoomBtn" class="join-button" disabled>Join Room</button>
+            </div>
+        </div>
+        
+        <div class="game-room hidden" id="gameRoom">
+            <h2>Game Room</h2>
+            <div class="room-id">Room: <span id="currentRoomId"></span></div>
+            
+            <div class="players-list">
+                <h3>Players (<span id="playerCount">0</span>)</h3>
+                <div id="playersContainer"></div>
+            </div>
+            
+            
+            <div class="emoji-selection">
+                <h3>Choose Your Emoji</h3>
+                <p id="emojiRoleDescription">Select the emoji you want to use in the game:</p>
+                <div class="emoji-options" id="playerEmojiSelection">
+                    <div class="emoji-option" data-emoji="💀">💀</div>
+                    <div class="emoji-option" data-emoji="⚔️">⚔️</div>
+                    <div class="emoji-option" data-emoji="🗡️">🗡️</div>
+                    <div class="emoji-option" data-emoji="☠️">☠️</div>
+                    <div class="emoji-option" data-emoji="👹">👹</div>
+                    <div class="emoji-option" data-emoji="😱">😱</div>
+                    <div class="emoji-option" data-emoji="🏃‍♂️">🏃‍♂️</div>
+                    <div class="emoji-option" data-emoji="😰">😰</div>
+                    <div class="emoji-option" data-emoji="😨">😨</div>
+                    <div class="emoji-option" data-emoji="🤯">🤯</div>
+                </div>
+            </div>
+            
+            <div class="game-options">
+                <h3>Game Options</h3>
+                <div class="option-item">
+                    <label>
+                        <input type="checkbox" id="enableObstacles">
+                        Add objects to hide behind (obstacles)
+                    </label>
+                    <p class="option-description">Adds random obstacles that block movement and provide cover</p>
+                </div>
+            </div>
+            
+            <div class="game-controls">
+                <button id="startGameRoomBtn" class="start-game-button" disabled>Start Game</button>
+                <button id="leaveRoomBtn" class="leave-button">Leave Room</button>
+            </div>
+        </div>
+        
+        <div class="game-board hidden" id="gameBoard">
+            <div class="game-info">
+                <div class="game-status">Game in progress...</div>
+                <div class="player-role" id="playerRole"></div>
+            </div>
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <div class="game-controls-info">
+                <p>Use arrow keys or touch to move</p>
+            </div>
+        </div>
+        
+        <div class="game-over hidden" id="gameOver">
+            <h2>You Got Dead!</h2>
+            <p>The game is over.</p>
+            <button id="newGameBtn" class="new-game-button">Start New Game</button>
+        </div>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
