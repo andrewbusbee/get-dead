@@ -25,7 +25,7 @@ class GameRoom {
       height: 600
     };
     this.obstacles = [];
-    this.obstaclesEnabled = false;
+    this.obstaclesEnabled = true; // Default to enabled
   }
 
   addPlayer(socketId, playerName) {
@@ -64,23 +64,32 @@ class GameRoom {
     if (!this.obstaclesEnabled) return;
     
     const obstacleEmojis = ['🪨', '🌳', '🏠', '🚗', '📦', '🪑', '🗿', '🛡️'];
-    const numObstacles = Math.floor(Math.random() * 8) + 5; // 5-12 obstacles
+    const numObstacles = 10; // Fixed 10 obstacles for consistent gameplay
     
     for (let i = 0; i < numObstacles; i++) {
       let x, y;
       let attempts = 0;
+      let validPosition = false;
       
       do {
         x = Math.random() * (this.gameBoard.width - 40) + 20;
         y = Math.random() * (this.gameBoard.height - 40) + 20;
         attempts++;
-      } while (this.isObstacleTooCloseToPlayers(x, y) && attempts < 50);
+        
+        // Check if position is valid (not too close to players and not blocking paths)
+        validPosition = !this.isObstacleTooCloseToPlayers(x, y) && 
+                       !this.isObstacleBlockingPlayerPaths(x, y);
+        
+      } while (!validPosition && attempts < 100);
       
-      this.obstacles.push({
-        x: x,
-        y: y,
-        emoji: obstacleEmojis[Math.floor(Math.random() * obstacleEmojis.length)]
-      });
+      // Only add obstacle if we found a valid position
+      if (validPosition) {
+        this.obstacles.push({
+          x: x,
+          y: y,
+          emoji: obstacleEmojis[Math.floor(Math.random() * obstacleEmojis.length)]
+        });
+      }
     }
   }
   
@@ -91,7 +100,101 @@ class GameRoom {
         Math.pow(player.position.x - x, 2) + 
         Math.pow(player.position.y - y, 2)
       );
-      return distance < 80; // Minimum distance from players
+      return distance < 100; // Increased minimum distance from players
+    });
+  }
+  
+  isObstacleBlockingPlayerPaths(x, y) {
+    const players = Array.from(this.players.values());
+    const obstacleRadius = 20;
+    const playerRadius = 15;
+    const minPathWidth = 40; // Minimum clear path width
+    
+    // Check if obstacle would block movement paths for any player
+    return players.some(player => {
+      const playerX = player.position.x;
+      const playerY = player.position.y;
+      
+      // Check if obstacle is in the immediate movement area around player
+      // This creates a "safe zone" around each player's starting position
+      const safeZoneRadius = 60;
+      const distanceToPlayer = Math.sqrt(
+        Math.pow(playerX - x, 2) + Math.pow(playerY - y, 2)
+      );
+      
+      if (distanceToPlayer < safeZoneRadius) {
+        return true; // Too close to player's starting area
+      }
+      
+      // Check if obstacle would block the main movement corridors
+      // Left side corridor (for Get Deader)
+      if (playerX < 200 && Math.abs(x - 100) < minPathWidth && Math.abs(y - playerY) < 100) {
+        return true;
+      }
+      
+      // Right side corridor (for Got Deaders)
+      if (playerX > 600 && Math.abs(x - 700) < minPathWidth && Math.abs(y - playerY) < 100) {
+        return true;
+      }
+      
+      // Center corridor (main playing area)
+      if (x > 300 && x < 500 && Math.abs(y - 300) < minPathWidth) {
+        return true;
+      }
+      
+      return false;
+    });
+  }
+  
+  ensurePlayerMovementPaths() {
+    const players = Array.from(this.players.values());
+    
+    players.forEach(player => {
+      const directions = ['up', 'down', 'left', 'right'];
+      const hasClearDirection = directions.some(direction => {
+        // Test if player can move in this direction
+        const testPos = this.getTestPosition(player.position, direction);
+        return !this.checkObstacleCollision(testPos);
+      });
+      
+      // If player is completely blocked, remove nearby obstacles
+      if (!hasClearDirection) {
+        console.log(`Player ${player.name} is blocked, clearing nearby obstacles`);
+        this.clearObstaclesNearPlayer(player);
+      }
+    });
+  }
+  
+  getTestPosition(currentPos, direction) {
+    const speed = 5;
+    const newPos = { ...currentPos };
+    
+    switch (direction) {
+      case 'up':
+        newPos.y = Math.max(20, newPos.y - speed);
+        break;
+      case 'down':
+        newPos.y = Math.min(this.gameBoard.height - 20, newPos.y + speed);
+        break;
+      case 'left':
+        newPos.x = Math.max(20, newPos.x - speed);
+        break;
+      case 'right':
+        newPos.x = Math.min(this.gameBoard.width - 20, newPos.x + speed);
+        break;
+    }
+    
+    return newPos;
+  }
+  
+  clearObstaclesNearPlayer(player) {
+    const clearRadius = 80;
+    this.obstacles = this.obstacles.filter(obstacle => {
+      const distance = Math.sqrt(
+        Math.pow(player.position.x - obstacle.x, 2) + 
+        Math.pow(player.position.y - obstacle.y, 2)
+      );
+      return distance > clearRadius;
     });
   }
   
@@ -107,10 +210,7 @@ class GameRoom {
     
     this.gameState = 'playing';
     
-    // Generate obstacles if enabled
-    this.generateObstacles();
-    
-    // Position players
+    // Position players FIRST
     const players = Array.from(this.players.values());
     const getDeader = players.find(p => p.isGetDeader);
     const gotDeaders = players.filter(p => !p.isGetDeader);
@@ -127,6 +227,12 @@ class GameRoom {
         y: 100 + (index * 80) 
       };
     });
+    
+    // Generate obstacles AFTER positioning players
+    this.generateObstacles();
+    
+    // Ensure all players have at least one clear direction to move
+    this.ensurePlayerMovementPaths();
     
     return true;
   }

@@ -18,7 +18,12 @@ class GetDeadGame {
         
         // Track obstacles
         this.obstacles = [];
-        this.obstaclesEnabled = false;
+        this.obstaclesEnabled = true; // Default to enabled
+        
+        // Trackpad state
+        this.trackpadActive = false;
+        this.trackpadCenter = null;
+        this.trackpadRadius = 50; // Half of trackpad width/height (100px / 2)
         
         this.initializeElements();
         this.setupEventListeners();
@@ -51,7 +56,11 @@ class GetDeadGame {
             
             gameCanvas: document.getElementById('gameCanvas'),
             playerRole: document.getElementById('playerRole'),
-            newGameBtn: document.getElementById('newGameBtn')
+            newGameBtn: document.getElementById('newGameBtn'),
+            
+            // Trackpad elements
+            mobileTrackpad: document.getElementById('mobileTrackpad'),
+            trackpadCenter: document.getElementById('trackpadCenter')
         };
     }
     
@@ -83,6 +92,9 @@ class GetDeadGame {
         
         // Touch controls for mobile
         this.setupTouchControls();
+        
+        // Trackpad controls for mobile
+        this.setupTrackpadControls();
     }
     
     connectToServer() {
@@ -117,8 +129,11 @@ class GetDeadGame {
             this.updateObstaclesFromServer(data.room.obstacles, data.room.obstaclesEnabled);
             this.updateRoomLink();
             this.showGameRoom();
-            this.updatePlayersList(data.room.players);
-            this.updateStartButton(this.canStartGame(data.room.players));
+            // Update players list and start button after showing game room
+            setTimeout(() => {
+                this.updatePlayersList(data.room.players);
+                this.updateStartButton(this.canStartGame(data.room.players));
+            }, 50);
         });
             
             this.socket.on('room-updated', (data) => {
@@ -143,6 +158,7 @@ class GetDeadGame {
         
         this.socket.on('new-game-requested', () => {
             console.log('New game requested by another player');
+            this.hideGameOver();
             this.showGameRoom();
         });
         
@@ -166,12 +182,23 @@ class GetDeadGame {
         // Only generate room ID if we don't already have one (from URL)
         if (!this.currentRoomId) {
             this.currentRoomId = this.generateRoomId();
+            this.updateRoomStatus('creating');
+        } else {
+            this.updateRoomStatus('joining');
         }
-        this.updateRoomLink();
     }
     
     generateRoomId() {
         return Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+    
+    updateRoomStatus(type) {
+        const statusMessage = document.getElementById('roomStatusMessage');
+        if (type === 'creating') {
+            statusMessage.textContent = 'You are creating a new game';
+        } else if (type === 'joining') {
+            statusMessage.textContent = `You are joining game ${this.currentRoomId}`;
+        }
     }
     
     updateRoomLink() {
@@ -224,6 +251,10 @@ class GetDeadGame {
         this.elements.gameSetup.classList.add('hidden');
         this.elements.gameRoom.classList.remove('hidden');
         this.elements.currentRoomId.textContent = this.currentRoomId;
+        this.updateRoomLink();
+        
+        // Sync checkbox with default enabled state
+        this.elements.enableObstacles.checked = this.obstaclesEnabled;
     }
     
     updatePlayersList(players) {
@@ -273,6 +304,9 @@ class GetDeadGame {
         
         // Update emoji selection based on current role
         this.updateEmojiSelectionForRole();
+        
+        // Update start button text based on current state
+        this.updateStartButton(this.canStartGame(players));
     }
     
     toggleChaser(playerId) {
@@ -286,6 +320,13 @@ class GetDeadGame {
             roomId: this.currentRoomId,
             playerId: playerId 
         });
+        
+        // Update button text immediately for better UX
+        setTimeout(() => {
+            if (this.gameState?.players) {
+                this.updateStartButton(this.canStartGame(this.gameState.players));
+            }
+        }, 100);
     }
     
     setupEmojiSelection() {
@@ -395,8 +436,20 @@ class GetDeadGame {
             this.elements.startGameRoomBtn.textContent = 'Start Game';
             this.elements.startGameRoomBtn.title = 'Ready to start the game!';
         } else {
-            this.elements.startGameRoomBtn.textContent = 'Start Game (Need Chaser)';
-            this.elements.startGameRoomBtn.title = 'At least one player must be designated as the chaser to start the game';
+            // Determine what's needed based on current state
+            const playerCount = this.gameState?.players?.length || 0;
+            const hasChaser = this.gameState?.players?.some(p => p.isGetDeader) || false;
+            
+            if (playerCount < 2) {
+                this.elements.startGameRoomBtn.textContent = 'Start Game (Need 2+ Players)';
+                this.elements.startGameRoomBtn.title = 'At least 2 players are required to start the game';
+            } else if (!hasChaser) {
+                this.elements.startGameRoomBtn.textContent = 'Start Game (Need Chaser)';
+                this.elements.startGameRoomBtn.title = 'At least one player must be designated as the chaser to start the game';
+            } else {
+                this.elements.startGameRoomBtn.textContent = 'Start Game';
+                this.elements.startGameRoomBtn.title = 'Ready to start the game!';
+            }
         }
     }
     
@@ -433,6 +486,9 @@ class GetDeadGame {
         
         // Initialize touch controls now that canvas exists
         this.initializeTouchControls();
+        
+        // Initialize trackpad
+        this.initializeTrackpad();
     }
     
     startGameLoop() {
@@ -464,21 +520,24 @@ class GetDeadGame {
         
         // Draw players
         this.gameState.players.forEach(player => {
-            if (!player.isAlive) return;
+            // Don't draw dead players, but do draw caught players as skulls
+            if (!player.isAlive && !player.isCaught) return;
             
             this.ctx.font = '24px Arial';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
             
+            // If caught, always show skull and crossbones
+            if (player.isCaught) {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillText('💀', player.position.x, player.position.y);
+                return;
+            }
+            
             // Get player's selected emoji, fallback to default based on role
             let emoji = this.playerEmojis.get(player.id);
             if (!emoji) {
                 emoji = player.isGetDeader ? '💀' : '😱';
-            }
-            
-            // If caught, show the chaser emoji
-            if (player.isCaught) {
-                emoji = '💀'; // Always show skull when caught
             }
             
             this.ctx.fillStyle = '#000';
@@ -706,6 +765,145 @@ class GetDeadGame {
         });
     }
     
+    setupTrackpadControls() {
+        // Trackpad controls will be set up when the canvas is initialized
+        // This prevents the error when elements don't exist yet
+    }
+    
+    initializeTrackpad() {
+        if (!this.elements.trackpadCenter) return;
+        
+        // Store trackpad center position for calculations
+        const trackpadRect = this.elements.mobileTrackpad.getBoundingClientRect();
+        this.trackpadCenter = {
+            x: trackpadRect.left + trackpadRect.width / 2,
+            y: trackpadRect.top + trackpadRect.height / 2
+        };
+        
+        // Update trackpad radius based on actual size
+        this.trackpadRadius = trackpadRect.width / 2;
+        
+        // Add touch event listeners to trackpad
+        this.elements.trackpadCenter.addEventListener('touchstart', (e) => this.handleTrackpadStart(e));
+        this.elements.trackpadCenter.addEventListener('touchmove', (e) => this.handleTrackpadMove(e));
+        this.elements.trackpadCenter.addEventListener('touchend', (e) => this.handleTrackpadEnd(e));
+        
+        // Add mouse events for testing on desktop
+        this.elements.trackpadCenter.addEventListener('mousedown', (e) => this.handleTrackpadStart(e));
+        this.elements.trackpadCenter.addEventListener('mousemove', (e) => this.handleTrackpadMove(e));
+        this.elements.trackpadCenter.addEventListener('mouseup', (e) => this.handleTrackpadEnd(e));
+        this.elements.trackpadCenter.addEventListener('mouseleave', (e) => this.handleTrackpadEnd(e));
+        
+        // Handle window resize to update trackpad position
+        window.addEventListener('resize', () => this.updateTrackpadPosition());
+    }
+    
+    handleTrackpadStart(e) {
+        e.preventDefault();
+        this.trackpadActive = true;
+        this.elements.trackpadCenter.classList.add('touching');
+        
+        // Update trackpad center position in case of window resize
+        const trackpadRect = this.elements.mobileTrackpad.getBoundingClientRect();
+        this.trackpadCenter = {
+            x: trackpadRect.left + trackpadRect.width / 2,
+            y: trackpadRect.top + trackpadRect.height / 2
+        };
+    }
+    
+    handleTrackpadMove(e) {
+        if (!this.trackpadActive) return;
+        
+        e.preventDefault();
+        
+        const touch = e.touches ? e.touches[0] : e;
+        const clientX = touch.clientX;
+        const clientY = touch.clientY;
+        
+        // Calculate direction from trackpad center
+        const deltaX = clientX - this.trackpadCenter.x;
+        const deltaY = clientY - this.trackpadCenter.y;
+        
+        // Calculate distance from center
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        // Only process if touch is within trackpad radius
+        if (distance <= this.trackpadRadius) {
+            this.processTrackpadInput(deltaX, deltaY);
+        }
+    }
+    
+    handleTrackpadEnd(e) {
+        e.preventDefault();
+        this.trackpadActive = false;
+        this.elements.trackpadCenter.classList.remove('touching');
+        
+        // Stop movement when trackpad is released
+        this.stopContinuousMovement();
+    }
+    
+    processTrackpadInput(deltaX, deltaY) {
+        if (!this.gameState || this.gameState.gameState !== 'playing') return;
+        
+        const currentPlayer = this.gameState.players.find(p => p.id === this.playerId);
+        if (!currentPlayer || !currentPlayer.isAlive || currentPlayer.isCaught) return;
+        
+        // Calculate angle and determine direction
+        const angle = Math.atan2(deltaY, deltaX);
+        const degrees = (angle * 180 / Math.PI + 360) % 360;
+        
+        // Determine primary direction based on angle
+        let direction = null;
+        const threshold = 30; // Degrees threshold for diagonal detection
+        
+        if (degrees >= 315 || degrees < 45) {
+            direction = 'right';
+        } else if (degrees >= 45 && degrees < 135) {
+            direction = 'down';
+        } else if (degrees >= 135 && degrees < 225) {
+            direction = 'left';
+        } else if (degrees >= 225 && degrees < 315) {
+            direction = 'up';
+        }
+        
+        // Check for diagonal movement
+        let directions = [direction];
+        if (Math.abs(deltaX) > 10 && Math.abs(deltaY) > 10) {
+            // Strong diagonal movement
+            if (degrees >= 315 || degrees < 45) {
+                if (deltaY < -10) directions = ['right', 'up'];
+                else if (deltaY > 10) directions = ['right', 'down'];
+            } else if (degrees >= 45 && degrees < 135) {
+                if (deltaX < -10) directions = ['down', 'left'];
+                else if (deltaX > 10) directions = ['down', 'right'];
+            } else if (degrees >= 135 && degrees < 225) {
+                if (deltaY < -10) directions = ['left', 'up'];
+                else if (deltaY > 10) directions = ['left', 'down'];
+            } else if (degrees >= 225 && degrees < 315) {
+                if (deltaX < -10) directions = ['up', 'left'];
+                else if (deltaX > 10) directions = ['up', 'right'];
+            }
+        }
+        
+        if (direction) {
+            this.pressedKeys.clear();
+            directions.forEach(dir => this.pressedKeys.add(dir));
+            this.startContinuousMovement();
+        }
+    }
+    
+    updateTrackpadPosition() {
+        if (!this.elements.trackpadCenter) return;
+        
+        // Update trackpad center position and radius
+        const trackpadRect = this.elements.mobileTrackpad.getBoundingClientRect();
+        this.trackpadCenter = {
+            x: trackpadRect.left + trackpadRect.width / 2,
+            y: trackpadRect.top + trackpadRect.height / 2
+        };
+        this.trackpadRadius = trackpadRect.width / 2;
+    }
+    
     checkGameOver() {
         if (this.gameState.gameState === 'finished') {
             this.showGameOver();
@@ -725,6 +923,10 @@ class GetDeadGame {
         this.elements.gameOver.classList.remove('hidden');
     }
     
+    hideGameOver() {
+        this.elements.gameOver.classList.add('hidden');
+    }
+    
     startNewGame() {
         console.log('Starting new game for all players');
         
@@ -733,8 +935,8 @@ class GetDeadGame {
             this.socket.emit('new-game', { roomId: this.currentRoomId });
         }
         
-        this.elements.gameOver.classList.add('hidden');
-        this.elements.gameRoom.classList.remove('hidden');
+        this.hideGameOver();
+        this.showGameRoom();
         
         // Reset game state
         this.gameState = null;
@@ -784,7 +986,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Auto-fill room ID and show setup
         setTimeout(() => {
             game.currentRoomId = roomId;
-            game.updateRoomLink();
+            game.updateRoomStatus('joining');
             game.elements.landingPage.classList.add('hidden');
             game.elements.gameSetup.classList.remove('hidden');
             console.log('Auto-filled room ID:', game.currentRoomId, 'and showing setup page');

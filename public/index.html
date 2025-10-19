@@ -15,21 +15,16 @@
         </div>
         
         <div class="game-setup hidden" id="gameSetup">
-            <h2>Game Setup</h2>
+            <h2 id="setupTitle">Game Setup</h2>
             <div class="setup-content">
                 <div class="player-info">
                     <label for="playerName">Your Name:</label>
                     <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
                 </div>
                 
-                <div class="room-info">
-                    <label>Game Room:</label>
-                    <div class="room-link-container">
-                        <input type="text" id="roomLink" readonly>
-                        <button id="copyLinkBtn">Copy Link</button>
-                    </div>
+                <div class="room-status" id="roomStatus">
+                    <p id="roomStatusMessage">You are creating a new game</p>
                 </div>
-                
                 
                 <button id="joinRoomBtn" class="join-button" disabled>Join Room</button>
             </div>
@@ -38,6 +33,14 @@
         <div class="game-room hidden" id="gameRoom">
             <h2>Game Room</h2>
             <div class="room-id">Room: <span id="currentRoomId"></span></div>
+            
+            <div class="room-link-section">
+                <label>Share Game Link:</label>
+                <div class="room-link-container">
+                    <input type="text" id="roomLink" readonly>
+                    <button id="copyLinkBtn">Copy Link</button>
+                </div>
+            </div>
             
             <div class="players-list">
                 <h3>Players (<span id="playerCount">0</span>)</h3>
@@ -66,7 +69,7 @@
                 <h3>Game Options</h3>
                 <div class="option-item">
                     <label>
-                        <input type="checkbox" id="enableObstacles">
+                        <input type="checkbox" id="enableObstacles" checked>
                         Add objects to hide behind (obstacles)
                     </label>
                     <p class="option-description">Adds random obstacles that block movement and provide cover</p>
@@ -86,7 +89,18 @@
             </div>
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <div class="game-controls-info">
-                <p>Use arrow keys or touch to move</p>
+                <p>Use arrow keys, touch, or the trackpad to move</p>
+            </div>
+            <!-- Mobile Trackpad -->
+            <div class="mobile-trackpad" id="mobileTrackpad">
+                <div class="trackpad-center" id="trackpadCenter">
+                    <div class="trackpad-arrows">
+                        <div class="arrow arrow-up">↑</div>
+                        <div class="arrow arrow-down">↓</div>
+                        <div class="arrow arrow-left">←</div>
+                        <div class="arrow arrow-right">→</div>
+                    </div>
+                </div>
             </div>
         </div>
         
