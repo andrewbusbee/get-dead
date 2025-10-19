@@ -724,7 +724,46 @@ class GetDeadGame {
         
         let touchStartX = 0;
         let touchStartY = 0;
+        let isTouching = false;
+        let currentDirection = null;
         
+        // Add touch events to the entire game board area for better mobile UX
+        const gameBoard = this.elements.gameBoard;
+        
+        // Touch start - anywhere on the game board
+        gameBoard.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!this.gameState || this.gameState.gameState !== 'playing') return;
+            
+            const touch = e.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            isTouching = true;
+            
+            // Calculate initial direction
+            this.updateTouchDirection(touch.clientX, touch.clientY, true);
+        });
+        
+        // Touch move - continuous movement while dragging
+        gameBoard.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!isTouching || !this.gameState || this.gameState.gameState !== 'playing') return;
+            
+            const touch = e.touches[0];
+            this.updateTouchDirection(touch.clientX, touch.clientY, false);
+        });
+        
+        // Touch end - stop movement
+        gameBoard.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (!isTouching) return;
+            
+            isTouching = false;
+            this.stopContinuousMovement();
+            this.updateTrackpadDisplay(null);
+        });
+        
+        // Also keep the original canvas touch events for swipe gestures
         this.canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             const touch = e.touches[0];
@@ -763,6 +802,81 @@ class GetDeadGame {
                 });
             }
         });
+    }
+    
+    updateTouchDirection(clientX, clientY, isStart) {
+        if (!this.gameState || this.gameState.gameState !== 'playing') return;
+        
+        const currentPlayer = this.gameState.players.find(p => p.id === this.playerId);
+        if (!currentPlayer || !currentPlayer.isAlive || currentPlayer.isCaught) return;
+        
+        // Calculate direction from touch position to center of screen
+        const gameBoardRect = this.elements.gameBoard.getBoundingClientRect();
+        const centerX = gameBoardRect.left + gameBoardRect.width / 2;
+        const centerY = gameBoardRect.top + gameBoardRect.height / 2;
+        
+        const deltaX = clientX - centerX;
+        const deltaY = clientY - centerY;
+        
+        // Calculate angle and determine direction
+        const angle = Math.atan2(deltaY, deltaX);
+        const degrees = (angle * 180 / Math.PI + 360) % 360;
+        
+        // Determine primary direction based on angle
+        let direction = null;
+        const threshold = 30; // Degrees threshold for diagonal detection
+        
+        if (degrees >= 315 || degrees < 45) {
+            direction = 'right';
+        } else if (degrees >= 45 && degrees < 135) {
+            direction = 'down';
+        } else if (degrees >= 135 && degrees < 225) {
+            direction = 'left';
+        } else if (degrees >= 225 && degrees < 315) {
+            direction = 'up';
+        }
+        
+        // Check for diagonal movement
+        let directions = [direction];
+        if (Math.abs(deltaX) > 20 && Math.abs(deltaY) > 20) {
+            // Strong diagonal movement
+            if (degrees >= 315 || degrees < 45) {
+                if (deltaY < -20) directions = ['right', 'up'];
+                else if (deltaY > 20) directions = ['right', 'down'];
+            } else if (degrees >= 45 && degrees < 135) {
+                if (deltaX < -20) directions = ['down', 'left'];
+                else if (deltaX > 20) directions = ['down', 'right'];
+            } else if (degrees >= 135 && degrees < 225) {
+                if (deltaY < -20) directions = ['left', 'up'];
+                else if (deltaY > 20) directions = ['left', 'down'];
+            } else if (degrees >= 225 && degrees < 315) {
+                if (deltaX < -20) directions = ['up', 'left'];
+                else if (deltaX > 20) directions = ['up', 'right'];
+            }
+        }
+        
+        if (direction) {
+            this.pressedKeys.clear();
+            directions.forEach(dir => this.pressedKeys.add(dir));
+            this.startContinuousMovement();
+            
+            // Update trackpad display to show current direction
+            this.updateTrackpadDisplay(directions);
+        }
+    }
+    
+    updateTrackpadDisplay(directions) {
+        if (!this.elements.trackpadCenter) return;
+        
+        // Remove all direction classes
+        this.elements.trackpadCenter.classList.remove('moving-up', 'moving-down', 'moving-left', 'moving-right');
+        
+        if (directions && directions.length > 0) {
+            // Add classes for each direction
+            directions.forEach(dir => {
+                this.elements.trackpadCenter.classList.add(`moving-${dir}`);
+            });
+        }
     }
     
     setupTrackpadControls() {

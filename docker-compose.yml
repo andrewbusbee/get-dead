@@ -1,6 +1,6 @@
 services:
   get-dead-server:
-    image: ghcr.io/andrewbusbee/get-dead:latest
+    image: ghcr.io/andrewbusbee/get-dead
     ports:
       - "3000:3000"
     restart: unless-stopped
