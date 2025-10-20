@@ -36,7 +36,7 @@ class AIPlayer {
     getSpeedMultiplier() {
         const multipliers = {
             easy: { chaser: 1.1, chased: 1.15 },
-            medium: { chaser: 1.15, chased: 1.2 },
+            medium: { chaser: 1.1, chased: 1.15 },
             hard: { chaser: 1.2, chased: 1.15 },
             nightmare: { chaser: 3.0, chased: 2.5 }
         };
@@ -46,7 +46,7 @@ class AIPlayer {
     getReactionTime() {
         const reactionTimes = {
             easy: 100,
-            medium: 80,
+            medium: 95,
             hard: 10,
             nightmare: 16 // ~60 FPS
         };
