@@ -21,12 +21,20 @@ class AIPlayer {
         this.currentDirection = null;
         this.avoidanceVector = { x: 0, y: 0 };
         this.lastPlayerPosition = { x: 0, y: 0 };
+        
+        // Chased AI specific state
+        this.currentTarget = null;
+        this.targetPersistence = 0;
+        this.lastPosition = { x: 0, y: 0 };
+        this.stuckCounter = 0;
+        this.momentumDirection = null;
+        this.momentumCounter = 0;
     }
     
     getSpeedMultiplier() {
         const multipliers = {
-            easy: { chaser: 1.2, chased: 1.15 },
-            medium: { chaser: 1.25, chased: 1.2 },
+            easy: { chaser: 1.1, chased: 1.15 },
+            medium: { chaser: 1.15, chased: 1.2 },
             hard: { chaser: 1.2, chased: 1.15 },
             nightmare: { chaser: 3.0, chased: 2.5 }
         };
@@ -100,13 +108,30 @@ class AIPlayer {
     }
     
     updateChasedBehavior(playerPosition, obstacles) {
-        // AI chased tries to avoid the player and explore the board
+        // Check if AI is stuck (not moving much)
+        const distanceMoved = Math.sqrt(
+            Math.pow(this.position.x - this.lastPosition.x, 2) + 
+            Math.pow(this.position.y - this.lastPosition.y, 2)
+        );
+        
+        if (distanceMoved < 2) {
+            this.stuckCounter++;
+        } else {
+            this.stuckCounter = 0;
+        }
+        
+        // Update last position
+        this.lastPosition = { x: this.position.x, y: this.position.y };
+        
         const dx = this.position.x - playerPosition.x;
         const dy = this.position.y - playerPosition.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
         // If too close to player, run away
         if (distance < 150) {
+            this.momentumDirection = null; // Reset momentum when fleeing
+            this.momentumCounter = 0;
+            
             const moveX = dx / distance;
             const moveY = dy / distance;
             
@@ -120,27 +145,71 @@ class AIPlayer {
             this.position.y = Math.max(20, Math.min(this.gameBoard.height - 20, adjustedPosition.y));
         } else {
             // If far from player, explore the board strategically
-            this.exploreBoard(playerPosition, obstacles);
+            this.exploreBoardImproved(playerPosition, obstacles);
         }
     }
     
-    exploreBoard(playerPosition, obstacles) {
-        // Strategic exploration of the board while maintaining distance from player
+    exploreBoardImproved(playerPosition, obstacles) {
         const speed = 5 * this.speedMultiplier;
         
-        // Define exploration targets (corners and edges of the board)
+        // If stuck for too long, force a new direction
+        if (this.stuckCounter > 10) {
+            this.currentTarget = null;
+            this.targetPersistence = 0;
+            this.momentumDirection = null;
+            this.momentumCounter = 0;
+            this.stuckCounter = 0;
+        }
+        
+        // Use momentum if available and not stuck
+        if (this.momentumDirection && this.momentumCounter > 0 && this.stuckCounter < 5) {
+            this.momentumCounter--;
+            this.moveInDirection(this.momentumDirection, speed, obstacles);
+            return;
+        }
+        
+        // If we have a current target and haven't reached it, continue towards it
+        if (this.currentTarget && this.targetPersistence > 0) {
+            const dx = this.currentTarget.x - this.position.x;
+            const dy = this.currentTarget.y - this.position.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance > 20) {
+                this.targetPersistence--;
+                this.moveTowardsTarget(this.currentTarget, speed, obstacles);
+                return;
+            }
+        }
+        
+        // Pick a new target
+        this.pickNewTarget(playerPosition);
+        
+        if (this.currentTarget) {
+            this.moveTowardsTarget(this.currentTarget, speed, obstacles);
+        } else {
+            // Fallback to random movement
+            this.randomMovement(obstacles);
+        }
+    }
+    
+    pickNewTarget(playerPosition) {
+        // Define exploration targets with better distribution
         const explorationTargets = [
-            { x: 50, y: 50 }, // Top-left
-            { x: this.gameBoard.width - 50, y: 50 }, // Top-right
-            { x: 50, y: this.gameBoard.height - 50 }, // Bottom-left
-            { x: this.gameBoard.width - 50, y: this.gameBoard.height - 50 }, // Bottom-right
-            { x: this.gameBoard.width / 2, y: 50 }, // Top-center
-            { x: this.gameBoard.width / 2, y: this.gameBoard.height - 50 }, // Bottom-center
-            { x: 50, y: this.gameBoard.height / 2 }, // Left-center
-            { x: this.gameBoard.width - 50, y: this.gameBoard.height / 2 } // Right-center
+            { x: 100, y: 100 }, // Top-left
+            { x: this.gameBoard.width - 100, y: 100 }, // Top-right
+            { x: 100, y: this.gameBoard.height - 100 }, // Bottom-left
+            { x: this.gameBoard.width - 100, y: this.gameBoard.height - 100 }, // Bottom-right
+            { x: this.gameBoard.width / 2, y: 100 }, // Top-center
+            { x: this.gameBoard.width / 2, y: this.gameBoard.height - 100 }, // Bottom-center
+            { x: 100, y: this.gameBoard.height / 2 }, // Left-center
+            { x: this.gameBoard.width - 100, y: this.gameBoard.height / 2 }, // Right-center
+            { x: this.gameBoard.width / 4, y: this.gameBoard.height / 4 }, // Quarter positions
+            { x: 3 * this.gameBoard.width / 4, y: this.gameBoard.height / 4 },
+            { x: this.gameBoard.width / 4, y: 3 * this.gameBoard.height / 4 },
+            { x: 3 * this.gameBoard.width / 4, y: 3 * this.gameBoard.height / 4 }
         ];
         
-        // Find the closest exploration target that's far from the player
+        // Find the best target
         let bestTarget = null;
         let bestScore = -1;
         
@@ -155,26 +224,26 @@ class AIPlayer {
             );
             
             // Prefer targets that are far from player and not too close to current position
-            const score = distanceToPlayer - (distanceToTarget * 0.3);
+            const score = distanceToPlayer - (distanceToTarget * 0.2);
             
-            if (score > bestScore && distanceToTarget > 30) {
+            if (score > bestScore && distanceToTarget > 50) {
                 bestScore = score;
                 bestTarget = target;
             }
         }
         
-        // If no good target found, use random movement
-        if (!bestTarget) {
-            this.randomMovement(obstacles);
-            return;
+        if (bestTarget) {
+            this.currentTarget = bestTarget;
+            this.targetPersistence = 30 + Math.random() * 20; // Persist for 30-50 frames
         }
-        
-        // Move towards the best target
-        const dx = bestTarget.x - this.position.x;
-        const dy = bestTarget.y - this.position.y;
+    }
+    
+    moveTowardsTarget(target, speed, obstacles) {
+        const dx = target.x - this.position.x;
+        const dy = target.y - this.position.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
-        if (distance > 5) {
+        if (distance > 2) {
             const moveX = dx / distance;
             const moveY = dy / distance;
             
@@ -185,10 +254,26 @@ class AIPlayer {
             
             this.position.x = Math.max(20, Math.min(this.gameBoard.width - 20, adjustedPosition.x));
             this.position.y = Math.max(20, Math.min(this.gameBoard.height - 20, adjustedPosition.y));
-        } else {
-            // Reached target, pick a new one next time
-            this.randomMovement(obstacles);
+            
+            // Set momentum direction
+            this.momentumDirection = { x: moveX, y: moveY };
+            this.momentumCounter = 5 + Math.random() * 10; // 5-15 frames of momentum
         }
+    }
+    
+    moveInDirection(direction, speed, obstacles) {
+        const newX = this.position.x + direction.x * speed;
+        const newY = this.position.y + direction.y * speed;
+        
+        const adjustedPosition = this.avoidObstacles({ x: newX, y: newY }, obstacles);
+        
+        this.position.x = Math.max(20, Math.min(this.gameBoard.width - 20, adjustedPosition.x));
+        this.position.y = Math.max(20, Math.min(this.gameBoard.height - 20, adjustedPosition.y));
+    }
+    
+    exploreBoard(playerPosition, obstacles) {
+        // Legacy method - redirect to improved version
+        this.exploreBoardImproved(playerPosition, obstacles);
     }
     
     randomMovement(obstacles) {
