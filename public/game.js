@@ -1363,8 +1363,8 @@ class GetDeadGame {
                     touchStartY = touch.clientY;
                     isTouching = true;
                     
-                    // Calculate initial direction relative to touch point
-                    this.updateTouchDirectionRelative(touch.clientX, touch.clientY, touchStartX, touchStartY, true);
+                    // Don't calculate direction on initial touch, just set up the reference point
+                    // Direction will be calculated on touchmove
                 }
             }
         });
@@ -1506,7 +1506,7 @@ class GetDeadGame {
         const deltaY = clientY - touchStartY;
         
         // Only process movement if there's significant displacement
-        const minMovement = 5; // Minimum pixels to register movement
+        const minMovement = 3; // Minimum pixels to register movement
         if (Math.abs(deltaX) < minMovement && Math.abs(deltaY) < minMovement) {
             return;
         }
@@ -1530,20 +1530,20 @@ class GetDeadGame {
         
         // Check for diagonal movement
         let directions = [direction];
-        if (Math.abs(deltaX) > 8 && Math.abs(deltaY) > 8) {
+        if (Math.abs(deltaX) > 5 && Math.abs(deltaY) > 5) {
             // Strong diagonal movement
             if (degrees >= 315 || degrees < 45) {
-                if (deltaY < -8) directions = ['right', 'up'];
-                else if (deltaY > 8) directions = ['right', 'down'];
+                if (deltaY < -5) directions = ['right', 'up'];
+                else if (deltaY > 5) directions = ['right', 'down'];
             } else if (degrees >= 45 && degrees < 135) {
-                if (deltaX < -8) directions = ['down', 'left'];
-                else if (deltaX > 8) directions = ['down', 'right'];
+                if (deltaX < -5) directions = ['down', 'left'];
+                else if (deltaX > 5) directions = ['down', 'right'];
             } else if (degrees >= 135 && degrees < 225) {
-                if (deltaY < -8) directions = ['left', 'up'];
-                else if (deltaY > 8) directions = ['left', 'down'];
+                if (deltaY < -5) directions = ['left', 'up'];
+                else if (deltaY > 5) directions = ['left', 'down'];
             } else if (degrees >= 225 && degrees < 315) {
-                if (deltaX < -8) directions = ['up', 'left'];
-                else if (deltaX > 8) directions = ['up', 'right'];
+                if (deltaX < -5) directions = ['up', 'left'];
+                else if (deltaX > 5) directions = ['up', 'right'];
             }
         }
         
