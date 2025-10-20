@@ -449,7 +449,7 @@ class GetDeadGame {
         this.soloGameState = null;
         this.aiPlayer = null;
         this.soloDifficulty = 'easy';
-        this.playerRole = 'chaser';
+        this.playerRole = 'chased';
         
         this.initializeElements();
         this.setupEventListeners();
@@ -1347,7 +1347,8 @@ class GetDeadGame {
         // Touch start - anywhere on the page
         document.addEventListener('touchstart', (e) => {
             // Only prevent default if we're in the game and not touching interactive elements
-            if (this.gameState && this.gameState.gameState === 'playing') {
+            const currentGameState = this.isSoloMode ? this.soloGameState : this.gameState;
+            if (currentGameState && currentGameState.gameState === 'playing') {
                 // Check if the touch is on an interactive element
                 const target = e.target;
                 const isInteractiveElement = target.tagName === 'INPUT' || 
@@ -1373,7 +1374,8 @@ class GetDeadGame {
         
         // Touch move - continuous movement while dragging
         document.addEventListener('touchmove', (e) => {
-            if (isTouching && this.gameState && this.gameState.gameState === 'playing') {
+            const currentGameState = this.isSoloMode ? this.soloGameState : this.gameState;
+            if (isTouching && currentGameState && currentGameState.gameState === 'playing') {
                 e.preventDefault();
                 const touch = e.touches[0];
                 this.updateTouchDirection(touch.clientX, touch.clientY, false);
@@ -1400,7 +1402,8 @@ class GetDeadGame {
         
         this.canvas.addEventListener('touchend', (e) => {
             e.preventDefault();
-            if (!this.gameState || this.gameState.gameState !== 'playing') return;
+            const currentGameState = this.isSoloMode ? this.soloGameState : this.gameState;
+            if (!currentGameState || currentGameState.gameState !== 'playing') return;
             
             const touch = e.changedTouches[0];
             const deltaX = touch.clientX - touchStartX;
@@ -1757,7 +1760,7 @@ class GetDeadGame {
         const roleRadios = document.querySelectorAll('input[name="playerRole"]');
         const difficultyRadios = document.querySelectorAll('input[name="difficulty"]');
         
-        this.playerRole = Array.from(roleRadios).find(radio => radio.checked)?.value || 'chaser';
+        this.playerRole = Array.from(roleRadios).find(radio => radio.checked)?.value || 'chased';
         this.soloDifficulty = Array.from(difficultyRadios).find(radio => radio.checked)?.value || 'easy';
         
         console.log('Solo game settings:', { role: this.playerRole, difficulty: this.soloDifficulty });
