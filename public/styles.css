@@ -195,6 +195,158 @@ body {
     cursor: not-allowed;
 }
 
+/* Game Mode Selection */
+.game-mode-selection {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.mode-button {
+    flex: 1;
+    max-width: 200px;
+    padding: 15px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.mode-button:hover:not(:disabled) {
+    background: #45a049;
+    transform: translateY(-2px);
+}
+
+.mode-button:disabled {
+    background: #666;
+    cursor: not-allowed;
+}
+
+/* Solo Mode Setup */
+.solo-mode-setup {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    padding: 30px;
+    margin: 20px 0;
+    backdrop-filter: blur(10px);
+}
+
+.solo-mode-setup h2 {
+    color: #ff4444;
+    margin-bottom: 30px;
+    font-size: 2rem;
+    text-align: center;
+}
+
+.role-selection, .difficulty-selection {
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.role-selection h3, .difficulty-selection h3 {
+    color: #fff;
+    margin-bottom: 15px;
+    font-size: 1.3rem;
+}
+
+.role-options, .difficulty-options {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.role-option, .difficulty-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 10px 15px;
+    border: 2px solid #666;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+    min-width: 120px;
+    justify-content: center;
+}
+
+.role-option:hover, .difficulty-option:hover {
+    border-color: #ff4444;
+    background: rgba(255, 68, 68, 0.2);
+}
+
+.role-option input[type="radio"], .difficulty-option input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #ff4444;
+    cursor: pointer;
+}
+
+.role-option input[type="radio"]:checked + .role-label,
+.difficulty-option input[type="radio"]:checked + .difficulty-label {
+    color: #ff4444;
+    font-weight: bold;
+}
+
+.role-option:has(input[type="radio"]:checked),
+.difficulty-option:has(input[type="radio"]:checked) {
+    border-color: #4CAF50;
+    background: rgba(76, 175, 80, 0.2);
+}
+
+.role-label, .difficulty-label {
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.solo-controls {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 30px;
+}
+
+.start-solo-button {
+    background: #ff4444;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.start-solo-button:hover {
+    background: #ff6666;
+    transform: translateY(-2px);
+}
+
+.back-button {
+    background: #666;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.back-button:hover {
+    background: #777;
+    transform: translateY(-2px);
+}
+
 /* Game Room */
 .game-room {
     background: rgba(255, 255, 255, 0.1);

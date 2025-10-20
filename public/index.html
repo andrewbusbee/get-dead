@@ -26,7 +26,10 @@
                     <p id="roomStatusMessage">You are creating a new game</p>
                 </div>
                 
-                <button id="joinRoomBtn" class="join-button" disabled>Join Room</button>
+                <div class="game-mode-selection">
+                    <button id="multiplayerModeBtn" class="mode-button" disabled>Multiplayer Mode</button>
+                    <button id="soloModeBtn" class="mode-button" disabled>Solo Mode</button>
+                </div>
             </div>
         </div>
         
@@ -79,6 +82,60 @@
             <div class="game-controls">
                 <button id="startGameRoomBtn" class="start-game-button" disabled>Start Game</button>
                 <button id="leaveRoomBtn" class="leave-button">Leave Room</button>
+            </div>
+        </div>
+        
+        <div class="solo-mode-setup hidden" id="soloModeSetup">
+            <h2>Solo Mode Setup</h2>
+            
+            <div class="setup-content">
+                <div class="role-selection">
+                    <h3>Choose Your Role</h3>
+                    <div class="role-options">
+                        <label class="role-option">
+                            <input type="radio" name="playerRole" value="chaser" checked>
+                            <span class="role-label">Chaser (You chase AI)</span>
+                        </label>
+                        <label class="role-option">
+                            <input type="radio" name="playerRole" value="chased">
+                            <span class="role-label">Chased (AI chases you)</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="difficulty-selection">
+                    <h3>Difficulty</h3>
+                    <div class="difficulty-options">
+                        <label class="difficulty-option">
+                            <input type="radio" name="difficulty" value="easy" checked>
+                            <span class="difficulty-label">Easy</span>
+                        </label>
+                        <label class="difficulty-option">
+                            <input type="radio" name="difficulty" value="hard">
+                            <span class="difficulty-label">Medium</span>
+                        </label>
+                        <label class="difficulty-option">
+                            <input type="radio" name="difficulty" value="nightmare">
+                            <span class="difficulty-label">Nightmare</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="game-options">
+                    <h3>Game Options</h3>
+                    <div class="option-item">
+                        <label>
+                            <input type="checkbox" id="soloEnableObstacles" checked>
+                            Add objects to hide behind (10 obstacles)
+                        </label>
+                        <p class="option-description">Adds random obstacles that block movement and provide cover</p>
+                    </div>
+                </div>
+                
+                <div class="solo-controls">
+                    <button id="startSoloGameBtn" class="start-solo-button">Start Solo Game</button>
+                    <button id="backToSetupBtn" class="back-button">Back to Setup</button>
+                </div>
             </div>
         </div>
         

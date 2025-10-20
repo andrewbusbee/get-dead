@@ -1,3 +1,198 @@
+// AI Player class for solo mode
+class AIPlayer {
+    constructor(difficulty, role, gameBoard) {
+        this.difficulty = difficulty;
+        this.role = role; // 'chaser' or 'chased'
+        this.gameBoard = gameBoard;
+        this.position = { x: 0, y: 0 };
+        this.isAlive = true;
+        this.isCaught = false;
+        this.isGetDeader = role === 'chaser';
+        this.emoji = role === 'chaser' ? '🤖' : '👾';
+        
+        // AI behavior settings based on difficulty
+        this.speedMultiplier = this.getSpeedMultiplier();
+        this.reactionTime = this.getReactionTime();
+        this.pathfindingAccuracy = this.getPathfindingAccuracy();
+        
+        // AI state
+        this.targetPosition = null;
+        this.lastMoveTime = 0;
+        this.currentDirection = null;
+        this.avoidanceVector = { x: 0, y: 0 };
+        this.lastPlayerPosition = { x: 0, y: 0 };
+    }
+    
+    getSpeedMultiplier() {
+        const multipliers = {
+            easy: { chaser: 1.2, chased: 1.15 },
+            medium: { chaser: 1.25, chased: 1.2 },
+            hard: { chaser: 1.2, chased: 1.15 },
+            nightmare: { chaser: 3.0, chased: 2.5 }
+        };
+        return multipliers[this.difficulty][this.role];
+    }
+    
+    getReactionTime() {
+        const reactionTimes = {
+            easy: 100,
+            medium: 50,
+            hard: 10,
+            nightmare: 16 // ~60 FPS
+        };
+        return reactionTimes[this.difficulty];
+    }
+    
+    getPathfindingAccuracy() {
+        const accuracies = {
+            easy: 0.7,
+            medium: 0.85,
+            hard: 0.95,
+            nightmare: 1.0
+        };
+        return accuracies[this.difficulty];
+    }
+    
+    update(playerPosition, obstacles, gameState) {
+        if (!this.isAlive || this.isCaught) return;
+        
+        const currentTime = Date.now();
+        if (currentTime - this.lastMoveTime < this.reactionTime) return;
+        
+        this.lastMoveTime = currentTime;
+        
+        if (this.role === 'chaser') {
+            this.updateChaserBehavior(playerPosition, obstacles);
+        } else {
+            this.updateChasedBehavior(playerPosition, obstacles);
+        }
+        
+        this.lastPlayerPosition = { ...playerPosition };
+    }
+    
+    updateChaserBehavior(playerPosition, obstacles) {
+        // AI chaser tries to get close to the player
+        const targetX = playerPosition.x;
+        const targetY = playerPosition.y;
+        
+        // Calculate direction to player
+        const dx = targetX - this.position.x;
+        const dy = targetY - this.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < 5) return; // Already very close
+        
+        // Normalize direction
+        const moveX = dx / distance;
+        const moveY = dy / distance;
+        
+        // Apply speed multiplier
+        const speed = 5 * this.speedMultiplier;
+        const newX = this.position.x + moveX * speed;
+        const newY = this.position.y + moveY * speed;
+        
+        // Check for obstacles and adjust path
+        const adjustedPosition = this.avoidObstacles({ x: newX, y: newY }, obstacles);
+        
+        // Ensure within bounds
+        this.position.x = Math.max(20, Math.min(this.gameBoard.width - 20, adjustedPosition.x));
+        this.position.y = Math.max(20, Math.min(this.gameBoard.height - 20, adjustedPosition.y));
+    }
+    
+    updateChasedBehavior(playerPosition, obstacles) {
+        // AI chased tries to avoid the player
+        const dx = this.position.x - playerPosition.x;
+        const dy = this.position.y - playerPosition.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // If too close to player, run away
+        if (distance < 100) {
+            const moveX = dx / distance;
+            const moveY = dy / distance;
+            
+            const speed = 5 * this.speedMultiplier;
+            const newX = this.position.x + moveX * speed;
+            const newY = this.position.y + moveY * speed;
+            
+            const adjustedPosition = this.avoidObstacles({ x: newX, y: newY }, obstacles);
+            
+            this.position.x = Math.max(20, Math.min(this.gameBoard.width - 20, adjustedPosition.x));
+            this.position.y = Math.max(20, Math.min(this.gameBoard.height - 20, adjustedPosition.y));
+        } else {
+            // If far from player, move around randomly to make it interesting
+            this.randomMovement(obstacles);
+        }
+    }
+    
+    randomMovement(obstacles) {
+        // Random movement when not being chased closely
+        const directions = ['up', 'down', 'left', 'right'];
+        const randomDirection = directions[Math.floor(Math.random() * directions.length)];
+        
+        const speed = 5 * this.speedMultiplier;
+        let newX = this.position.x;
+        let newY = this.position.y;
+        
+        switch (randomDirection) {
+            case 'up':
+                newY = Math.max(20, newY - speed);
+                break;
+            case 'down':
+                newY = Math.min(this.gameBoard.height - 20, newY + speed);
+                break;
+            case 'left':
+                newX = Math.max(20, newX - speed);
+                break;
+            case 'right':
+                newX = Math.min(this.gameBoard.width - 20, newX + speed);
+                break;
+        }
+        
+        const adjustedPosition = this.avoidObstacles({ x: newX, y: newY }, obstacles);
+        
+        this.position.x = adjustedPosition.x;
+        this.position.y = adjustedPosition.y;
+    }
+    
+    avoidObstacles(targetPosition, obstacles) {
+        if (!obstacles || obstacles.length === 0) return targetPosition;
+        
+        const playerRadius = 15;
+        const obstacleRadius = 20;
+        const minDistance = playerRadius + obstacleRadius;
+        
+        let adjustedX = targetPosition.x;
+        let adjustedY = targetPosition.y;
+        
+        for (const obstacle of obstacles) {
+            const dx = adjustedX - obstacle.x;
+            const dy = adjustedY - obstacle.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < minDistance) {
+                // Calculate avoidance vector
+                const avoidX = dx / distance;
+                const avoidY = dy / distance;
+                
+                // Move away from obstacle
+                adjustedX = obstacle.x + avoidX * minDistance;
+                adjustedY = obstacle.y + avoidY * minDistance;
+            }
+        }
+        
+        return { x: adjustedX, y: adjustedY };
+    }
+    
+    setPosition(x, y) {
+        this.position.x = x;
+        this.position.y = y;
+    }
+    
+    getPosition() {
+        return { ...this.position };
+    }
+}
+
 class GetDeadGame {
     constructor() {
         this.socket = null;
@@ -25,6 +220,13 @@ class GetDeadGame {
         this.trackpadCenter = null;
         this.trackpadRadius = 50; // Half of trackpad width/height (100px / 2)
         
+        // Solo mode state
+        this.isSoloMode = false;
+        this.soloGameState = null;
+        this.aiPlayer = null;
+        this.soloDifficulty = 'easy';
+        this.playerRole = 'chaser';
+        
         this.initializeElements();
         this.setupEventListeners();
         // Connect to server immediately when page loads
@@ -36,6 +238,7 @@ class GetDeadGame {
             landingPage: document.querySelector('.landing-page'),
             gameSetup: document.getElementById('gameSetup'),
             gameRoom: document.getElementById('gameRoom'),
+            soloModeSetup: document.getElementById('soloModeSetup'),
             gameBoard: document.getElementById('gameBoard'),
             gameOver: document.getElementById('gameOver'),
             
@@ -43,7 +246,8 @@ class GetDeadGame {
             playerName: document.getElementById('playerName'),
             roomLink: document.getElementById('roomLink'),
             copyLinkBtn: document.getElementById('copyLinkBtn'),
-            joinRoomBtn: document.getElementById('joinRoomBtn'),
+            multiplayerModeBtn: document.getElementById('multiplayerModeBtn'),
+            soloModeBtn: document.getElementById('soloModeBtn'),
             
             currentRoomId: document.getElementById('currentRoomId'),
             playerCount: document.getElementById('playerCount'),
@@ -61,7 +265,12 @@ class GetDeadGame {
             // Trackpad elements
             mobileTrackpad: document.getElementById('mobileTrackpad'),
             trackpadCenter: document.getElementById('trackpadCenter'),
-            trackpadDot: document.getElementById('trackpadDot')
+            trackpadDot: document.getElementById('trackpadDot'),
+            
+            // Solo mode elements
+            startSoloGameBtn: document.getElementById('startSoloGameBtn'),
+            backToSetupBtn: document.getElementById('backToSetupBtn'),
+            soloEnableObstacles: document.getElementById('soloEnableObstacles')
         };
     }
     
@@ -70,9 +279,10 @@ class GetDeadGame {
         this.elements.startGameBtn.addEventListener('click', () => this.showGameSetup());
         
         // Game setup
-        this.elements.playerName.addEventListener('input', () => this.validateJoinButton());
+        this.elements.playerName.addEventListener('input', () => this.validateModeButtons());
         this.elements.copyLinkBtn.addEventListener('click', () => this.copyRoomLink());
-        this.elements.joinRoomBtn.addEventListener('click', () => this.joinRoom());
+        this.elements.multiplayerModeBtn.addEventListener('click', () => this.joinRoom());
+        this.elements.soloModeBtn.addEventListener('click', () => this.showSoloModeSetup());
         
         // Game room
         this.elements.startGameRoomBtn.addEventListener('click', () => this.startGame());
@@ -86,6 +296,11 @@ class GetDeadGame {
         
         // Game over
         this.elements.newGameBtn.addEventListener('click', () => this.startNewGame());
+        
+        // Solo mode
+        this.elements.startSoloGameBtn.addEventListener('click', () => this.startSoloGame());
+        this.elements.backToSetupBtn.addEventListener('click', () => this.backToGameSetup());
+        this.elements.soloEnableObstacles.addEventListener('change', () => this.toggleSoloObstacles());
         
         // Keyboard controls for smooth movement
         document.addEventListener('keydown', (e) => this.handleKeyDown(e));
@@ -218,9 +433,11 @@ class GetDeadGame {
         }, 2000);
     }
     
-    validateJoinButton() {
+    validateModeButtons() {
         const playerName = this.elements.playerName.value.trim();
-        this.elements.joinRoomBtn.disabled = playerName.length === 0;
+        const isNameValid = playerName.length > 0;
+        this.elements.multiplayerModeBtn.disabled = !isNameValid;
+        this.elements.soloModeBtn.disabled = !isNameValid;
     }
     
     joinRoom() {
@@ -246,6 +463,19 @@ class GetDeadGame {
             roomId: this.currentRoomId,
             playerName: playerName
         });
+    }
+    
+    showSoloModeSetup() {
+        this.elements.gameSetup.classList.add('hidden');
+        this.elements.soloModeSetup.classList.remove('hidden');
+        
+        // Set default values
+        this.elements.soloEnableObstacles.checked = this.obstaclesEnabled;
+    }
+    
+    backToGameSetup() {
+        this.elements.soloModeSetup.classList.add('hidden');
+        this.elements.gameSetup.classList.remove('hidden');
     }
     
     showGameRoom() {
@@ -415,6 +645,11 @@ class GetDeadGame {
         }
     }
     
+    toggleSoloObstacles() {
+        this.obstaclesEnabled = this.elements.soloEnableObstacles.checked;
+        console.log('Solo obstacles enabled:', this.obstaclesEnabled);
+    }
+    
     updateObstaclesFromServer(obstacles, enabled) {
         this.obstacles = obstacles || [];
         this.obstaclesEnabled = enabled;
@@ -467,13 +702,24 @@ class GetDeadGame {
     }
     
     showGameBoard() {
-        this.elements.gameRoom.classList.add('hidden');
+        if (this.isSoloMode) {
+            this.elements.soloModeSetup.classList.add('hidden');
+        } else {
+            this.elements.gameRoom.classList.add('hidden');
+        }
         this.elements.gameBoard.classList.remove('hidden');
         
         // Update player role display
-        const currentPlayer = this.gameState.players.find(p => p.id === this.playerId);
-        if (currentPlayer) {
-            this.elements.playerRole.textContent = currentPlayer.isGetDeader ? 'You are the Get Deader!' : 'You are a Got Deader!';
+        if (this.isSoloMode) {
+            const currentPlayer = this.soloGameState.players[0];
+            if (currentPlayer) {
+                this.elements.playerRole.textContent = currentPlayer.isGetDeader ? 'You are the Get Deader!' : 'You are a Got Deader!';
+            }
+        } else {
+            const currentPlayer = this.gameState.players.find(p => p.id === this.playerId);
+            if (currentPlayer) {
+                this.elements.playerRole.textContent = currentPlayer.isGetDeader ? 'You are the Get Deader!' : 'You are a Got Deader!';
+            }
         }
     }
     
@@ -497,20 +743,62 @@ class GetDeadGame {
     }
     
     gameLoop() {
+        if (this.isSoloMode) {
+            this.updateSoloGame();
+        }
         this.drawGame();
         this.animationId = requestAnimationFrame(() => this.gameLoop());
     }
     
+    updateSoloGame() {
+        if (!this.soloGameState || !this.aiPlayer) return;
+        
+        const player = this.soloGameState.players[0];
+        
+        // Update AI player
+        this.aiPlayer.update(player.position, this.soloGameState.obstacles, this.soloGameState);
+        
+        // Check for collisions
+        this.checkSoloCollisions();
+    }
+    
+    checkSoloCollisions() {
+        const player = this.soloGameState.players[0];
+        const aiPos = this.aiPlayer.getPosition();
+        
+        const distance = Math.sqrt(
+            Math.pow(player.position.x - aiPos.x, 2) +
+            Math.pow(player.position.y - aiPos.y, 2)
+        );
+        
+        if (distance < 30) { // Collision threshold
+            if (this.playerRole === 'chaser') {
+                // Player caught AI
+                this.aiPlayer.isCaught = true;
+                this.aiPlayer.isAlive = false;
+                this.soloGameState.gameState = 'finished';
+                this.showGameOver();
+            } else {
+                // AI caught player
+                player.isCaught = true;
+                player.isAlive = false;
+                this.soloGameState.gameState = 'finished';
+                this.showGameOver();
+            }
+        }
+    }
+    
     drawGame() {
-        if (!this.gameState) return;
+        const currentGameState = this.isSoloMode ? this.soloGameState : this.gameState;
+        if (!currentGameState) return;
         
         // Clear canvas
         this.ctx.fillStyle = '#228B22';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
         // Draw obstacles
-        if (this.gameState.obstaclesEnabled && this.gameState.obstacles && this.gameState.obstacles.length > 0) {
-            this.gameState.obstacles.forEach(obstacle => {
+        if (currentGameState.obstaclesEnabled && currentGameState.obstacles && currentGameState.obstacles.length > 0) {
+            currentGameState.obstacles.forEach(obstacle => {
                 this.ctx.font = '32px Arial';
                 this.ctx.textAlign = 'center';
                 this.ctx.textBaseline = 'middle';
@@ -519,7 +807,43 @@ class GetDeadGame {
             });
         }
         
-        // Draw players
+        if (this.isSoloMode) {
+            // Draw solo mode players
+            this.drawSoloPlayers();
+        } else {
+            // Draw multiplayer players
+            this.drawMultiplayerPlayers();
+        }
+    }
+    
+    drawSoloPlayers() {
+        const player = this.soloGameState.players[0];
+        const aiPos = this.aiPlayer.getPosition();
+        
+        this.ctx.font = '24px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        
+        // Draw player
+        if (player.isAlive && !player.isCaught) {
+            this.ctx.fillStyle = '#000';
+            this.ctx.fillText(player.emoji, player.position.x, player.position.y);
+        } else if (player.isCaught) {
+            this.ctx.fillStyle = '#000';
+            this.ctx.fillText('💀', player.position.x, player.position.y);
+        }
+        
+        // Draw AI player
+        if (this.aiPlayer.isAlive && !this.aiPlayer.isCaught) {
+            this.ctx.fillStyle = '#000';
+            this.ctx.fillText(this.aiPlayer.emoji, aiPos.x, aiPos.y);
+        } else if (this.aiPlayer.isCaught) {
+            this.ctx.fillStyle = '#000';
+            this.ctx.fillText('💀', aiPos.x, aiPos.y);
+        }
+    }
+    
+    drawMultiplayerPlayers() {
         this.gameState.players.forEach(player => {
             // Don't draw dead players, but do draw caught players as skulls
             if (!player.isAlive && !player.isCaught) return;
@@ -547,9 +871,16 @@ class GetDeadGame {
     }
     
     handleKeyDown(e) {
-        if (!this.gameState || this.gameState.gameState !== 'playing') return;
+        const currentGameState = this.isSoloMode ? this.soloGameState : this.gameState;
+        if (!currentGameState || currentGameState.gameState !== 'playing') return;
         
-        const currentPlayer = this.gameState.players.find(p => p.id === this.playerId);
+        let currentPlayer;
+        if (this.isSoloMode) {
+            currentPlayer = currentGameState.players[0];
+        } else {
+            currentPlayer = currentGameState.players.find(p => p.id === this.playerId);
+        }
+        
         if (!currentPlayer || !currentPlayer.isAlive || currentPlayer.isCaught) return;
         
         let direction = null;
@@ -625,6 +956,29 @@ class GetDeadGame {
     }
     
     sendMovement(directions) {
+        if (this.isSoloMode) {
+            this.handleSoloMovement(directions);
+        } else {
+            this.handleMultiplayerMovement(directions);
+        }
+    }
+    
+    handleSoloMovement(directions) {
+        const currentPlayer = this.soloGameState.players[0];
+        if (!currentPlayer) return;
+        
+        const newPosition = this.calculateNewPosition(currentPlayer.position, directions);
+        
+        // Check if new position collides with obstacles
+        if (this.checkSoloObstacleCollision(newPosition)) {
+            return; // Don't move if would collide with obstacle
+        }
+        
+        // Update player position directly
+        currentPlayer.position = newPosition;
+    }
+    
+    handleMultiplayerMovement(directions) {
         if (!this.socket || !this.socket.connected) return;
         
         // Check for obstacle collisions before sending movement
@@ -703,6 +1057,24 @@ class GetDeadGame {
         const playerRadius = 15; // Approximate player collision radius
         
         for (const obstacle of this.gameState.obstacles) {
+            const distance = Math.sqrt(
+                Math.pow(position.x - obstacle.x, 2) + Math.pow(position.y - obstacle.y, 2)
+            );
+            
+            if (distance < playerRadius + 20) { // Use fixed obstacle size
+                return true; // Collision detected
+            }
+        }
+        
+        return false;
+    }
+    
+    checkSoloObstacleCollision(position) {
+        if (!this.soloGameState.obstaclesEnabled || !this.soloGameState.obstacles) return false;
+        
+        const playerRadius = 15; // Approximate player collision radius
+        
+        for (const obstacle of this.soloGameState.obstacles) {
             const distance = Math.sqrt(
                 Math.pow(position.x - obstacle.x, 2) + Math.pow(position.y - obstacle.y, 2)
             );
@@ -819,9 +1191,16 @@ class GetDeadGame {
     }
     
     updateTouchDirection(clientX, clientY, isStart) {
-        if (!this.gameState || this.gameState.gameState !== 'playing') return;
+        const currentGameState = this.isSoloMode ? this.soloGameState : this.gameState;
+        if (!currentGameState || currentGameState.gameState !== 'playing') return;
         
-        const currentPlayer = this.gameState.players.find(p => p.id === this.playerId);
+        let currentPlayer;
+        if (this.isSoloMode) {
+            currentPlayer = currentGameState.players[0];
+        } else {
+            currentPlayer = currentGameState.players.find(p => p.id === this.playerId);
+        }
+        
         if (!currentPlayer || !currentPlayer.isAlive || currentPlayer.isCaught) return;
         
         // Calculate direction from touch position to center of the viewport
@@ -1038,9 +1417,16 @@ class GetDeadGame {
     }
     
     processTrackpadInput(deltaX, deltaY) {
-        if (!this.gameState || this.gameState.gameState !== 'playing') return;
+        const currentGameState = this.isSoloMode ? this.soloGameState : this.gameState;
+        if (!currentGameState || currentGameState.gameState !== 'playing') return;
         
-        const currentPlayer = this.gameState.players.find(p => p.id === this.playerId);
+        let currentPlayer;
+        if (this.isSoloMode) {
+            currentPlayer = currentGameState.players[0];
+        } else {
+            currentPlayer = currentGameState.players.find(p => p.id === this.playerId);
+        }
+        
         if (!currentPlayer || !currentPlayer.isAlive || currentPlayer.isCaught) return;
         
         // Calculate angle and determine direction
@@ -1100,7 +1486,8 @@ class GetDeadGame {
     }
     
     checkGameOver() {
-        if (this.gameState.gameState === 'finished') {
+        const currentGameState = this.isSoloMode ? this.soloGameState : this.gameState;
+        if (currentGameState && currentGameState.gameState === 'finished') {
             this.showGameOver();
         }
     }
@@ -1122,20 +1509,150 @@ class GetDeadGame {
         this.elements.gameOver.classList.add('hidden');
     }
     
+    startSoloGame() {
+        console.log('Starting solo game');
+        
+        // Get selected role and difficulty
+        const roleRadios = document.querySelectorAll('input[name="playerRole"]');
+        const difficultyRadios = document.querySelectorAll('input[name="difficulty"]');
+        
+        this.playerRole = Array.from(roleRadios).find(radio => radio.checked)?.value || 'chaser';
+        this.soloDifficulty = Array.from(difficultyRadios).find(radio => radio.checked)?.value || 'easy';
+        
+        console.log('Solo game settings:', { role: this.playerRole, difficulty: this.soloDifficulty });
+        
+        // Create solo game state
+        this.isSoloMode = true;
+        this.soloGameState = this.createSoloGameState();
+        
+        // Create AI player
+        const aiRole = this.playerRole === 'chaser' ? 'chased' : 'chaser';
+        this.aiPlayer = new AIPlayer(this.soloDifficulty, aiRole, this.soloGameState.gameBoard);
+        
+        // Position players
+        this.positionSoloPlayers();
+        
+        // Generate obstacles
+        this.generateSoloObstacles();
+        
+        // Start the game
+        this.showGameBoard();
+        this.initializeCanvas();
+        this.startGameLoop();
+    }
+    
+    createSoloGameState() {
+        return {
+            roomId: 'solo',
+            players: [
+                {
+                    id: 'player',
+                    name: this.elements.playerName.value.trim(),
+                    isGetDeader: this.playerRole === 'chaser',
+                    position: { x: 0, y: 0 },
+                    isCaught: false,
+                    isAlive: true,
+                    emoji: this.selectedPlayerEmoji
+                }
+            ],
+            gameState: 'playing',
+            gameBoard: {
+                width: 800,
+                height: 600
+            },
+            obstacles: [],
+            obstaclesEnabled: this.obstaclesEnabled
+        };
+    }
+    
+    positionSoloPlayers() {
+        const player = this.soloGameState.players[0];
+        
+        if (this.playerRole === 'chaser') {
+            // Player is chaser, spawn on left
+            player.position = { x: 50, y: this.soloGameState.gameBoard.height / 2 };
+            // AI is chased, spawn on right
+            this.aiPlayer.setPosition(this.soloGameState.gameBoard.width - 100, 100);
+        } else {
+            // Player is chased, spawn on right
+            player.position = { x: this.soloGameState.gameBoard.width - 100, y: 100 };
+            // AI is chaser, spawn on left
+            this.aiPlayer.setPosition(50, this.soloGameState.gameBoard.height / 2);
+        }
+    }
+    
+    generateSoloObstacles() {
+        if (!this.obstaclesEnabled) return;
+        
+        this.soloGameState.obstacles = [];
+        const obstacleEmojis = ['🪨', '🌳', '🏠', '🚗', '📦', '🪑', '🗿', '🛡️'];
+        const numObstacles = 10;
+        
+        for (let i = 0; i < numObstacles; i++) {
+            let x, y;
+            let attempts = 0;
+            let validPosition = false;
+            
+            do {
+                x = Math.random() * (this.soloGameState.gameBoard.width - 40) + 20;
+                y = Math.random() * (this.soloGameState.gameBoard.height - 40) + 20;
+                attempts++;
+                
+                // Check if position is valid (not too close to players)
+                validPosition = !this.isObstacleTooCloseToSoloPlayers(x, y);
+                
+            } while (!validPosition && attempts < 100);
+            
+            if (validPosition) {
+                this.soloGameState.obstacles.push({
+                    x: x,
+                    y: y,
+                    emoji: obstacleEmojis[Math.floor(Math.random() * obstacleEmojis.length)]
+                });
+            }
+        }
+    }
+    
+    isObstacleTooCloseToSoloPlayers(x, y) {
+        const player = this.soloGameState.players[0];
+        const aiPos = this.aiPlayer.getPosition();
+        
+        const distanceToPlayer = Math.sqrt(
+            Math.pow(player.position.x - x, 2) + Math.pow(player.position.y - y, 2)
+        );
+        const distanceToAI = Math.sqrt(
+            Math.pow(aiPos.x - x, 2) + Math.pow(aiPos.y - y, 2)
+        );
+        
+        return distanceToPlayer < 100 || distanceToAI < 100;
+    }
+    
     startNewGame() {
         console.log('Starting new game for all players');
         
-        // Emit new game event to server to notify all players
-        if (this.socket && this.socket.connected) {
-            this.socket.emit('new-game', { roomId: this.currentRoomId });
+        if (this.isSoloMode) {
+            // Solo mode new game
+            this.hideGameOver();
+            this.showSoloModeSetup();
+            this.resetSoloGame();
+        } else {
+            // Multiplayer new game
+            if (this.socket && this.socket.connected) {
+                this.socket.emit('new-game', { roomId: this.currentRoomId });
+            }
+            this.hideGameOver();
+            this.showGameRoom();
         }
-        
-        this.hideGameOver();
-        this.showGameRoom();
         
         // Reset game state
         this.gameState = null;
         this.animationId = null;
+    }
+    
+    resetSoloGame() {
+        this.isSoloMode = false;
+        this.soloGameState = null;
+        this.aiPlayer = null;
     }
     
     leaveRoom() {
@@ -1158,7 +1675,11 @@ class GetDeadGame {
         
         // Reset form
         this.elements.playerName.value = '';
-        this.elements.joinRoomBtn.disabled = true;
+        this.elements.multiplayerModeBtn.disabled = true;
+        this.elements.soloModeBtn.disabled = true;
+        
+        // Reset solo mode state
+        this.resetSoloGame();
         
         // Reconnect to server
         this.connectToServer();
