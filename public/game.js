@@ -34,18 +34,22 @@ class AIPlayer {
     }
     
     getSpeedMultiplier() {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
         const multipliers = {
             easy: { chaser: 1.1, chased: 1.15 },
-            medium: { chaser: 1.12, chased: 1.18 },
+            medium: isMobile ? { chaser: 1.08, chased: 1.12 } : { chaser: 1.12, chased: 1.18 },
             nightmare: { chaser: 3.0, chased: 2.5 }
         };
         return multipliers[this.difficulty][this.role];
     }
     
     getReactionTime() {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
         const reactionTimes = {
             easy: 100,
-            medium: 75,
+            medium: isMobile ? 90 : 75,
             nightmare: 16 // ~60 FPS
         };
         return reactionTimes[this.difficulty];
