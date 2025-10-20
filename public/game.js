@@ -46,7 +46,7 @@ class AIPlayer {
     getReactionTime() {
         const reactionTimes = {
             easy: 100,
-            medium: 95,
+            medium: 98,
             hard: 10,
             nightmare: 16 // ~60 FPS
         };
