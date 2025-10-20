@@ -29,12 +29,14 @@ class AIPlayer {
         this.stuckCounter = 0;
         this.momentumDirection = null;
         this.momentumCounter = 0;
+        this.cornerEscapeMode = false;
+        this.cornerEscapeCounter = 0;
     }
     
     getSpeedMultiplier() {
         const multipliers = {
             easy: { chaser: 1.1, chased: 1.15 },
-            medium: { chaser: 1.15, chased: 1.2 },
+            medium: { chaser: 1.12, chased: 1.17 },
             hard: { chaser: 1.2, chased: 1.15 },
             nightmare: { chaser: 3.0, chased: 2.5 }
         };
@@ -122,6 +124,23 @@ class AIPlayer {
         
         // Update last position
         this.lastPosition = { x: this.position.x, y: this.position.y };
+        
+        // Check for corner detection
+        const isInCorner = this.detectCorner();
+        
+        // If in corner, enter escape mode
+        if (isInCorner && !this.cornerEscapeMode) {
+            this.cornerEscapeMode = true;
+            this.cornerEscapeCounter = 30; // Escape for 30 frames
+            this.currentTarget = null; // Clear current target
+            this.targetPersistence = 0;
+        }
+        
+        // Handle corner escape mode
+        if (this.cornerEscapeMode) {
+            this.handleCornerEscape(playerPosition, obstacles);
+            return;
+        }
         
         const dx = this.position.x - playerPosition.x;
         const dy = this.position.y - playerPosition.y;
@@ -269,6 +288,59 @@ class AIPlayer {
         
         this.position.x = Math.max(20, Math.min(this.gameBoard.width - 20, adjustedPosition.x));
         this.position.y = Math.max(20, Math.min(this.gameBoard.height - 20, adjustedPosition.y));
+    }
+    
+    detectCorner() {
+        // Define corner zones (within 60px of any corner)
+        const cornerZone = 60;
+        const x = this.position.x;
+        const y = this.position.y;
+        
+        // Check if in any corner zone
+        const inTopLeft = x < cornerZone && y < cornerZone;
+        const inTopRight = x > (this.gameBoard.width - cornerZone) && y < cornerZone;
+        const inBottomLeft = x < cornerZone && y > (this.gameBoard.height - cornerZone);
+        const inBottomRight = x > (this.gameBoard.width - cornerZone) && y > (this.gameBoard.height - cornerZone);
+        
+        return inTopLeft || inTopRight || inBottomLeft || inBottomRight;
+    }
+    
+    handleCornerEscape(playerPosition, obstacles) {
+        const speed = 5 * this.speedMultiplier;
+        
+        // Decrease escape counter
+        this.cornerEscapeCounter--;
+        
+        // If escape counter is done, exit escape mode
+        if (this.cornerEscapeCounter <= 0) {
+            this.cornerEscapeMode = false;
+            return;
+        }
+        
+        // Calculate escape direction (away from nearest corner toward center)
+        const centerX = this.gameBoard.width / 2;
+        const centerY = this.gameBoard.height / 2;
+        
+        const escapeX = centerX - this.position.x;
+        const escapeY = centerY - this.position.y;
+        const escapeDistance = Math.sqrt(escapeX * escapeX + escapeY * escapeY);
+        
+        if (escapeDistance > 0) {
+            const moveX = escapeX / escapeDistance;
+            const moveY = escapeY / escapeDistance;
+            
+            const newX = this.position.x + moveX * speed;
+            const newY = this.position.y + moveY * speed;
+            
+            const adjustedPosition = this.avoidObstacles({ x: newX, y: newY }, obstacles);
+            
+            this.position.x = Math.max(20, Math.min(this.gameBoard.width - 20, adjustedPosition.x));
+            this.position.y = Math.max(20, Math.min(this.gameBoard.height - 20, adjustedPosition.y));
+            
+            // Set momentum for smooth escape
+            this.momentumDirection = { x: moveX, y: moveY };
+            this.momentumCounter = 10;
+        }
     }
     
     exploreBoard(playerPosition, obstacles) {
