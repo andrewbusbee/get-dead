@@ -499,10 +499,7 @@ class GetDeadGame {
             // Solo mode elements
             startSoloGameBtn: document.getElementById('startSoloGameBtn'),
             backToSetupBtn: document.getElementById('backToSetupBtn'),
-            soloEnableObstacles: document.getElementById('soloEnableObstacles'),
-            
-            // Exit game button
-            exitGameBtn: document.getElementById('exitGameBtn')
+            soloEnableObstacles: document.getElementById('soloEnableObstacles')
         };
     }
     
@@ -534,9 +531,6 @@ class GetDeadGame {
         this.elements.startSoloGameBtn.addEventListener('click', () => this.startSoloGame());
         this.elements.backToSetupBtn.addEventListener('click', () => this.backToGameSetup());
         this.elements.soloEnableObstacles.addEventListener('change', () => this.toggleSoloObstacles());
-        
-        // Exit game
-        this.elements.exitGameBtn.addEventListener('click', () => this.exitGame());
         
         // Keyboard controls for smooth movement
         document.addEventListener('keydown', (e) => this.handleKeyDown(e));
@@ -1364,12 +1358,13 @@ class GetDeadGame {
                 if (!isInteractiveElement) {
                     e.preventDefault();
                     const touch = e.touches[0];
+                    // Set the initial touch point as our reference (0,0)
                     touchStartX = touch.clientX;
                     touchStartY = touch.clientY;
                     isTouching = true;
                     
-                    // Calculate initial direction
-                    this.updateTouchDirection(touch.clientX, touch.clientY, true);
+                    // Calculate initial direction relative to touch point
+                    this.updateTouchDirectionRelative(touch.clientX, touch.clientY, touchStartX, touchStartY, true);
                 }
             }
         });
@@ -1380,7 +1375,8 @@ class GetDeadGame {
             if (isTouching && currentGameState && currentGameState.gameState === 'playing') {
                 e.preventDefault();
                 const touch = e.touches[0];
-                this.updateTouchDirection(touch.clientX, touch.clientY, false);
+                // Calculate direction relative to initial touch point
+                this.updateTouchDirectionRelative(touch.clientX, touch.clientY, touchStartX, touchStartY, false);
             }
         });
         
@@ -1398,40 +1394,28 @@ class GetDeadGame {
         this.canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             const touch = e.touches[0];
+            // Set the initial touch point as our reference (0,0)
             touchStartX = touch.clientX;
             touchStartY = touch.clientY;
+            isTouching = true;
+        });
+        
+        this.canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const currentGameState = this.isSoloMode ? this.soloGameState : this.gameState;
+            if (isTouching && currentGameState && currentGameState.gameState === 'playing') {
+                const touch = e.touches[0];
+                // Calculate direction relative to initial touch point
+                this.updateTouchDirectionRelative(touch.clientX, touch.clientY, touchStartX, touchStartY, false);
+            }
         });
         
         this.canvas.addEventListener('touchend', (e) => {
             e.preventDefault();
-            const currentGameState = this.isSoloMode ? this.soloGameState : this.gameState;
-            if (!currentGameState || currentGameState.gameState !== 'playing') return;
-            
-            const touch = e.changedTouches[0];
-            const deltaX = touch.clientX - touchStartX;
-            const deltaY = touch.clientY - touchStartY;
-            
-            const currentPlayer = this.gameState.players.find(p => p.id === this.playerId);
-            if (!currentPlayer || !currentPlayer.isAlive || currentPlayer.isCaught) return;
-            
-            let direction = null;
-            const minSwipeDistance = 30;
-            
-            if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                if (Math.abs(deltaX) > minSwipeDistance) {
-                    direction = deltaX > 0 ? 'right' : 'left';
-                }
-            } else {
-                if (Math.abs(deltaY) > minSwipeDistance) {
-                    direction = deltaY > 0 ? 'down' : 'up';
-                }
-            }
-            
-            if (direction) {
-                this.socket.emit('move-player', {
-                    roomId: this.currentRoomId,
-                    direction: direction
-                });
+            if (isTouching) {
+                isTouching = false;
+                this.stopContinuousMovement();
+                this.updateTrackpadDisplay(null);
             }
         });
     }
@@ -1491,6 +1475,75 @@ class GetDeadGame {
             } else if (degrees >= 225 && degrees < 315) {
                 if (deltaX < -20) directions = ['up', 'left'];
                 else if (deltaX > 20) directions = ['up', 'right'];
+            }
+        }
+        
+        if (direction) {
+            this.pressedKeys.clear();
+            directions.forEach(dir => this.pressedKeys.add(dir));
+            this.startContinuousMovement();
+            
+            // Update trackpad display to show current direction
+            this.updateTrackpadDisplay(directions);
+        }
+    }
+    
+    updateTouchDirectionRelative(clientX, clientY, touchStartX, touchStartY, isStart) {
+        const currentGameState = this.isSoloMode ? this.soloGameState : this.gameState;
+        if (!currentGameState || currentGameState.gameState !== 'playing') return;
+        
+        let currentPlayer;
+        if (this.isSoloMode) {
+            currentPlayer = currentGameState.players[0];
+        } else {
+            currentPlayer = currentGameState.players.find(p => p.id === this.playerId);
+        }
+        
+        if (!currentPlayer || !currentPlayer.isAlive || currentPlayer.isCaught) return;
+        
+        // Calculate direction relative to the initial touch point (0,0 reference)
+        const deltaX = clientX - touchStartX;
+        const deltaY = clientY - touchStartY;
+        
+        // Only process movement if there's significant displacement
+        const minMovement = 5; // Minimum pixels to register movement
+        if (Math.abs(deltaX) < minMovement && Math.abs(deltaY) < minMovement) {
+            return;
+        }
+        
+        // Calculate angle and determine direction
+        const angle = Math.atan2(deltaY, deltaX);
+        const degrees = (angle * 180 / Math.PI + 360) % 360;
+        
+        // Determine primary direction based on angle
+        let direction = null;
+        
+        if (degrees >= 315 || degrees < 45) {
+            direction = 'right';
+        } else if (degrees >= 45 && degrees < 135) {
+            direction = 'down';
+        } else if (degrees >= 135 && degrees < 225) {
+            direction = 'left';
+        } else if (degrees >= 225 && degrees < 315) {
+            direction = 'up';
+        }
+        
+        // Check for diagonal movement
+        let directions = [direction];
+        if (Math.abs(deltaX) > 8 && Math.abs(deltaY) > 8) {
+            // Strong diagonal movement
+            if (degrees >= 315 || degrees < 45) {
+                if (deltaY < -8) directions = ['right', 'up'];
+                else if (deltaY > 8) directions = ['right', 'down'];
+            } else if (degrees >= 45 && degrees < 135) {
+                if (deltaX < -8) directions = ['down', 'left'];
+                else if (deltaX > 8) directions = ['down', 'right'];
+            } else if (degrees >= 135 && degrees < 225) {
+                if (deltaY < -8) directions = ['left', 'up'];
+                else if (deltaY > 8) directions = ['left', 'down'];
+            } else if (degrees >= 225 && degrees < 315) {
+                if (deltaX < -8) directions = ['up', 'left'];
+                else if (deltaX > 8) directions = ['up', 'right'];
             }
         }
         
@@ -1901,18 +1954,6 @@ class GetDeadGame {
         this.aiPlayer = null;
     }
     
-    exitGame() {
-        if (this.isSoloMode) {
-            // Solo mode: go back to solo setup page
-            this.elements.gameBoard.classList.add('hidden');
-            this.elements.soloModeSetup.classList.remove('hidden');
-            this.resetSoloGame();
-        } else {
-            // Multiplayer mode: go back to game room
-            this.elements.gameBoard.classList.add('hidden');
-            this.elements.gameRoom.classList.remove('hidden');
-        }
-    }
     
     leaveRoom() {
         // Stop movement when leaving room
