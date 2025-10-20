@@ -1363,6 +1363,14 @@ class GetDeadGame {
                     touchStartY = touch.clientY;
                     isTouching = true;
                     
+                    // Debug logging for production
+                    console.log('Touch start detected:', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY,
+                        isTouching: isTouching,
+                        gameState: currentGameState.gameState
+                    });
+                    
                     // Don't calculate direction on initial touch, just set up the reference point
                     // Direction will be calculated on touchmove
                 }
@@ -1375,6 +1383,16 @@ class GetDeadGame {
             if (isTouching && currentGameState && currentGameState.gameState === 'playing') {
                 e.preventDefault();
                 const touch = e.touches[0];
+                
+                // Debug logging for production
+                console.log('Touch move detected:', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY,
+                    deltaX: touch.clientX - touchStartX,
+                    deltaY: touch.clientY - touchStartY,
+                    isTouching: isTouching
+                });
+                
                 // Calculate direction relative to initial touch point
                 this.updateTouchDirectionRelative(touch.clientX, touch.clientY, touchStartX, touchStartY, false);
             }
@@ -1384,6 +1402,14 @@ class GetDeadGame {
         document.addEventListener('touchend', (e) => {
             if (isTouching) {
                 e.preventDefault();
+                
+                // Debug logging for production
+                console.log('Touch end detected:', {
+                    isTouching: isTouching,
+                    touches: e.touches.length,
+                    changedTouches: e.changedTouches.length
+                });
+                
                 isTouching = false;
                 this.stopContinuousMovement();
                 this.updateTrackpadDisplay(null);
@@ -1490,7 +1516,10 @@ class GetDeadGame {
     
     updateTouchDirectionRelative(clientX, clientY, touchStartX, touchStartY, isStart) {
         const currentGameState = this.isSoloMode ? this.soloGameState : this.gameState;
-        if (!currentGameState || currentGameState.gameState !== 'playing') return;
+        if (!currentGameState || currentGameState.gameState !== 'playing') {
+            console.log('Touch direction update skipped - game not playing');
+            return;
+        }
         
         let currentPlayer;
         if (this.isSoloMode) {
@@ -1499,7 +1528,10 @@ class GetDeadGame {
             currentPlayer = currentGameState.players.find(p => p.id === this.playerId);
         }
         
-        if (!currentPlayer || !currentPlayer.isAlive || currentPlayer.isCaught) return;
+        if (!currentPlayer || !currentPlayer.isAlive || currentPlayer.isCaught) {
+            console.log('Touch direction update skipped - player not available');
+            return;
+        }
         
         // Calculate direction relative to the initial touch point (0,0 reference)
         const deltaX = clientX - touchStartX;
@@ -1508,6 +1540,7 @@ class GetDeadGame {
         // Only process movement if there's significant displacement
         const minMovement = 3; // Minimum pixels to register movement
         if (Math.abs(deltaX) < minMovement && Math.abs(deltaY) < minMovement) {
+            console.log('Touch movement too small:', { deltaX, deltaY, minMovement });
             return;
         }
         
@@ -1548,12 +1581,26 @@ class GetDeadGame {
         }
         
         if (direction) {
+            console.log('Touch movement executing:', {
+                direction: direction,
+                directions: directions,
+                deltaX: deltaX,
+                deltaY: deltaY,
+                degrees: degrees
+            });
+            
             this.pressedKeys.clear();
             directions.forEach(dir => this.pressedKeys.add(dir));
             this.startContinuousMovement();
             
             // Update trackpad display to show current direction
             this.updateTrackpadDisplay(directions);
+        } else {
+            console.log('No direction calculated from touch:', {
+                deltaX: deltaX,
+                deltaY: deltaY,
+                degrees: degrees
+            });
         }
     }
     

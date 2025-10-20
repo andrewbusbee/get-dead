@@ -5,7 +5,16 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+
+// Configure Socket.IO with CORS settings for production
+const io = socketIo(server, {
+  cors: {
+    origin: "*", // Allow all origins in production
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ['websocket', 'polling'] // Ensure both transports work
+});
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
