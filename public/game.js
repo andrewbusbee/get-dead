@@ -248,6 +248,9 @@ class GetDeadGame {
             copyLinkBtn: document.getElementById('copyLinkBtn'),
             multiplayerModeBtn: document.getElementById('multiplayerModeBtn'),
             soloModeBtn: document.getElementById('soloModeBtn'),
+            gameModeSelection: document.getElementById('gameModeSelection'),
+            joinRoomSection: document.getElementById('joinRoomSection'),
+            enterGameRoomBtn: document.getElementById('enterGameRoomBtn'),
             
             currentRoomId: document.getElementById('currentRoomId'),
             playerCount: document.getElementById('playerCount'),
@@ -283,10 +286,11 @@ class GetDeadGame {
         this.elements.copyLinkBtn.addEventListener('click', () => this.copyRoomLink());
         this.elements.multiplayerModeBtn.addEventListener('click', () => this.joinRoom());
         this.elements.soloModeBtn.addEventListener('click', () => this.showSoloModeSetup());
+        this.elements.enterGameRoomBtn.addEventListener('click', () => this.joinRoom());
         
         // Game room
         this.elements.startGameRoomBtn.addEventListener('click', () => this.startGame());
-        this.elements.leaveRoomBtn.addEventListener('click', () => this.leaveRoom());
+        this.elements.leaveRoomBtn.addEventListener('click', () => window.location.href = '/');
         
         // Emoji selection
         this.setupEmojiSelection();
@@ -399,8 +403,14 @@ class GetDeadGame {
         if (!this.currentRoomId) {
             this.currentRoomId = this.generateRoomId();
             this.updateRoomStatus('creating');
+            // Show mode selection buttons for new games
+            this.elements.gameModeSelection.classList.remove('hidden');
+            this.elements.joinRoomSection.classList.add('hidden');
         } else {
             this.updateRoomStatus('joining');
+            // Show enter game room button for joining existing games
+            this.elements.gameModeSelection.classList.add('hidden');
+            this.elements.joinRoomSection.classList.remove('hidden');
         }
     }
     
@@ -438,6 +448,7 @@ class GetDeadGame {
         const isNameValid = playerName.length > 0;
         this.elements.multiplayerModeBtn.disabled = !isNameValid;
         this.elements.soloModeBtn.disabled = !isNameValid;
+        this.elements.enterGameRoomBtn.disabled = !isNameValid;
     }
     
     joinRoom() {
@@ -1677,6 +1688,7 @@ class GetDeadGame {
         this.elements.playerName.value = '';
         this.elements.multiplayerModeBtn.disabled = true;
         this.elements.soloModeBtn.disabled = true;
+        this.elements.enterGameRoomBtn.disabled = true;
         
         // Reset solo mode state
         this.resetSoloGame();
@@ -1702,9 +1714,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Auto-fill room ID and show setup
         setTimeout(() => {
             game.currentRoomId = roomId;
-            game.updateRoomStatus('joining');
-            game.elements.landingPage.classList.add('hidden');
-            game.elements.gameSetup.classList.remove('hidden');
+            game.showGameSetup();
             console.log('Auto-filled room ID:', game.currentRoomId, 'and showing setup page');
         }, 100);
     }
