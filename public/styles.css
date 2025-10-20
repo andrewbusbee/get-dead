@@ -933,3 +933,16 @@ body {
     background: rgba(255, 255, 255, 0.3);
     transform: translate(-50%, -50%);
 }
+
+/* Credits */
+.credits {
+    margin-top: 40px;
+    padding: 20px;
+    text-align: center;
+}
+
+.credits p {
+    color: #888;
+    font-size: 0.9rem;
+    font-style: italic;
+}
