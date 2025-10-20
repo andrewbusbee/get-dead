@@ -100,13 +100,13 @@ class AIPlayer {
     }
     
     updateChasedBehavior(playerPosition, obstacles) {
-        // AI chased tries to avoid the player
+        // AI chased tries to avoid the player and explore the board
         const dx = this.position.x - playerPosition.x;
         const dy = this.position.y - playerPosition.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
         // If too close to player, run away
-        if (distance < 100) {
+        if (distance < 150) {
             const moveX = dx / distance;
             const moveY = dy / distance;
             
@@ -119,13 +119,80 @@ class AIPlayer {
             this.position.x = Math.max(20, Math.min(this.gameBoard.width - 20, adjustedPosition.x));
             this.position.y = Math.max(20, Math.min(this.gameBoard.height - 20, adjustedPosition.y));
         } else {
-            // If far from player, move around randomly to make it interesting
+            // If far from player, explore the board strategically
+            this.exploreBoard(playerPosition, obstacles);
+        }
+    }
+    
+    exploreBoard(playerPosition, obstacles) {
+        // Strategic exploration of the board while maintaining distance from player
+        const speed = 5 * this.speedMultiplier;
+        
+        // Define exploration targets (corners and edges of the board)
+        const explorationTargets = [
+            { x: 50, y: 50 }, // Top-left
+            { x: this.gameBoard.width - 50, y: 50 }, // Top-right
+            { x: 50, y: this.gameBoard.height - 50 }, // Bottom-left
+            { x: this.gameBoard.width - 50, y: this.gameBoard.height - 50 }, // Bottom-right
+            { x: this.gameBoard.width / 2, y: 50 }, // Top-center
+            { x: this.gameBoard.width / 2, y: this.gameBoard.height - 50 }, // Bottom-center
+            { x: 50, y: this.gameBoard.height / 2 }, // Left-center
+            { x: this.gameBoard.width - 50, y: this.gameBoard.height / 2 } // Right-center
+        ];
+        
+        // Find the closest exploration target that's far from the player
+        let bestTarget = null;
+        let bestScore = -1;
+        
+        for (const target of explorationTargets) {
+            const distanceToPlayer = Math.sqrt(
+                Math.pow(target.x - playerPosition.x, 2) + 
+                Math.pow(target.y - playerPosition.y, 2)
+            );
+            const distanceToTarget = Math.sqrt(
+                Math.pow(target.x - this.position.x, 2) + 
+                Math.pow(target.y - this.position.y, 2)
+            );
+            
+            // Prefer targets that are far from player and not too close to current position
+            const score = distanceToPlayer - (distanceToTarget * 0.3);
+            
+            if (score > bestScore && distanceToTarget > 30) {
+                bestScore = score;
+                bestTarget = target;
+            }
+        }
+        
+        // If no good target found, use random movement
+        if (!bestTarget) {
+            this.randomMovement(obstacles);
+            return;
+        }
+        
+        // Move towards the best target
+        const dx = bestTarget.x - this.position.x;
+        const dy = bestTarget.y - this.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance > 5) {
+            const moveX = dx / distance;
+            const moveY = dy / distance;
+            
+            const newX = this.position.x + moveX * speed;
+            const newY = this.position.y + moveY * speed;
+            
+            const adjustedPosition = this.avoidObstacles({ x: newX, y: newY }, obstacles);
+            
+            this.position.x = Math.max(20, Math.min(this.gameBoard.width - 20, adjustedPosition.x));
+            this.position.y = Math.max(20, Math.min(this.gameBoard.height - 20, adjustedPosition.y));
+        } else {
+            // Reached target, pick a new one next time
             this.randomMovement(obstacles);
         }
     }
     
     randomMovement(obstacles) {
-        // Random movement when not being chased closely
+        // Fallback random movement
         const directions = ['up', 'down', 'left', 'right'];
         const randomDirection = directions[Math.floor(Math.random() * directions.length)];
         
@@ -273,7 +340,10 @@ class GetDeadGame {
             // Solo mode elements
             startSoloGameBtn: document.getElementById('startSoloGameBtn'),
             backToSetupBtn: document.getElementById('backToSetupBtn'),
-            soloEnableObstacles: document.getElementById('soloEnableObstacles')
+            soloEnableObstacles: document.getElementById('soloEnableObstacles'),
+            
+            // Exit game button
+            exitGameBtn: document.getElementById('exitGameBtn')
         };
     }
     
@@ -305,6 +375,9 @@ class GetDeadGame {
         this.elements.startSoloGameBtn.addEventListener('click', () => this.startSoloGame());
         this.elements.backToSetupBtn.addEventListener('click', () => this.backToGameSetup());
         this.elements.soloEnableObstacles.addEventListener('change', () => this.toggleSoloObstacles());
+        
+        // Exit game
+        this.elements.exitGameBtn.addEventListener('click', () => this.exitGame());
         
         // Keyboard controls for smooth movement
         document.addEventListener('keydown', (e) => this.handleKeyDown(e));
@@ -1664,6 +1737,19 @@ class GetDeadGame {
         this.isSoloMode = false;
         this.soloGameState = null;
         this.aiPlayer = null;
+    }
+    
+    exitGame() {
+        if (this.isSoloMode) {
+            // Solo mode: go back to solo setup page
+            this.elements.gameBoard.classList.add('hidden');
+            this.elements.soloModeSetup.classList.remove('hidden');
+            this.resetSoloGame();
+        } else {
+            // Multiplayer mode: go back to game room
+            this.elements.gameBoard.classList.add('hidden');
+            this.elements.gameRoom.classList.remove('hidden');
+        }
     }
     
     leaveRoom() {
